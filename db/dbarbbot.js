@@ -1,61 +1,24 @@
 const mongodb   = require('mongodb');
-const mongoose  = require('mongoose');
-//const        = require('./models/bot.js');
+const mongoose  = require('mongoose'); 
 const func      = require('../functions');
 require('dotenv').config();
 
 
-const db        = process.env.DBPATH;
-//const procID    = process.env.PROCID;
+const db        = process.env.DBPATH; 
 mongoose
     .connect(db)
     .then((res) => console.log('Connected to DB'))
     .catch((err) => console.log(err));
 
-    const Schema = mongoose.Schema;
-    const procSchema = new Schema ({
-    stage:              { type: Number, },
-    strategy:           { type: String, },
-    pairLeft:           { type: String, },
-    pairRigh:           { type: String, },
-    pairLeftA:          { type: String, },
-    pairLeftC:          { type: String, },
-    pairRighA:          { type: String, },
-    pairRighC:          { type: String, },
-    balLeftA:           { type: Number, },
-    balLeftC:           { type: Number, },
-    balRighA:           { type: Number, },
-    balRighC:           { type: Number, },
-    rateLeft:           { type: Number, },
-    rateRigh:           { type: Number, },
-    disbalLeft:         { type: Number, },
-    disbalRigh:         { type: Number, },
-    amount:             { type: Number, },
-    amountC:            { type: Number, },
-    stage:              { type: Number, },
-    orderLeftBuy:       { type: String, },
-    orderRighBuy:       { type: String, },
-    orderLeftSell:      { type: String, },
-    orderRighSell:      { type: String, },
-    orderLeftBuyPrice:  { type: Number, },
-    orderRighBuyPrice:  { type: Number, },
-    orderLeftSellPrice: { type: Number, },
-    orderRighSellPrice: { type: Number, },
-    orderLeftBuyClosed: { type: Boolean,},
-    orderRighBuyClosed: { type: Boolean,},
-    orderLeftSellClosed:{ type: Boolean,},
-    orderRighSellClosed:{ type: Boolean,},
-    dealId:             { type: String, },
-    maskId:             { type: String, },
-
-    lastAction:         { type: String, },
-    }, {timestamps: true});
-    const Proc = mongoose.model('Proc', procSchema); 
+    const Schema = mongoose.Schema; 
 
     const maskSchema = new Schema ({
         enabled:            { type: Boolean,},
         stage:              { type: Number, },
+        exchangeLeft:       { type: String, },
+        exchangeRigh:       { type: String, },
         strategy:           { type: String, },
+        procType:           { type: String, },
         pairLeft:           { type: String, },
         pairRigh:           { type: String, },
         pairLeftA:          { type: String, },
@@ -85,12 +48,13 @@ mongoose
         orderRighBuyClosed: { type: Boolean,},
         orderLeftSellClosed:{ type: Boolean,},
         orderRighSellClosed:{ type: Boolean,},
+        botId:              { type: String, },
         procId:             { type: String, },
         dealId:             { type: String, },
-    
         lastAction:         { type: String, },
         }, {timestamps: true});
         const Mask = mongoose.model('Mask', maskSchema); 
+        const Proc = mongoose.model('Proc', maskSchema); 
     
     const dealSchema = new Schema ({
         procId:             { type: String, },
@@ -112,7 +76,14 @@ mongoose
     const logSchema = new Schema ({
     text:   { type: String, } }, {timestamps: true});
     const Log = mongoose.model('Log', logSchema); 
-
+    const botprocSchema = new Schema ({
+        botId:      { type: String, }, 
+        procId:     { type: String, },
+        active:     { type: Boolean,}, 
+    
+    }, {timestamps: true});
+        const Botproc = mongoose.model('Botproc', botprocSchema); 
+    
     const scopeSchema = new Schema ({
         buy:    { type: Number, }, 
         sell:   { type: Number, } 
@@ -144,6 +115,7 @@ async function saveOrder(bot, orderType, order) {
         proc[orderType] = order.id;
         bot[orderType]  = order.id;
         await addLog(`${orderType} ${order.id} with price ${order.order.price.toFixed(4)} added`);
+        await proc.save();
     }
     if (order.order.status == 'closed') {
         proc[orderType + 'Price']   = order.order.average;
@@ -151,6 +123,7 @@ async function saveOrder(bot, orderType, order) {
         bot[orderType + 'Price']    = order.order.average;
         bot[orderType + 'Closed']   = true;
         await addLog(`${orderType} ${order.id} with price ${order.order.average.toFixed(4)} added`);
+        await proc.save();
     }
     return bot;
 }
@@ -246,7 +219,10 @@ async function saveDeal(proc){
 } 
 async function addMask1() {
     let m = new Mask({
-        strategy:   'arbitr1',
+        strategy:   'B/W-arbitrTEST',
+        procType:   'xxx/waves',
+        exchangeLeft:   'binance',
+        exchangeRigh:   'wavesdex',
         pairLeft:   'WAVES/USDT',
         pairRigh:   'WAVES/USDN',
         pairLeftA:  'WAVES',
@@ -260,46 +236,10 @@ async function addMask1() {
         rateLeft:   1.0,
         rateRigh:   1.015,
         disbalLeft: 0.9,
-        disbalRigh: 0.3,
+        disbalRigh: 0.9,
         amount:     2,
-        amountC:    100,     
-        stage:      0,
-        orderLeftBuy: '',
-        orderRighBuy: '',
-        orderLeftSell: '',
-        orderRighSell: '',
-        orderLeftBuyPrice: 0,
-        orderRighBuyPrice: 0,
-        orderLeftSellPrice: 0,
-        orderRighSellPrice: 0,
-        orderLeftBuyClosed: false,
-        orderRighBuyClosed: false,
-        orderLeftSellClosed:false,
-        orderRighSellClosed:false,
-        procId: '',
-        dealId: '',
-        enabled: true,
-    
-    });
-    let p = new Proc({
-        strategy:   m.strategy,
-        pairLeft:   m.pairLeft,
-        pairRigh:   m.pairRigh,
-        pairLeftA:  m.pairLeftA,
-        pairLeftC:  m.pairLeftC,
-        pairRighA:  m.pairRighA,
-        pairRighC:  m.pairRighC,
-        balLeftA:   0,
-        balLeftC:   0,
-        balRighA:   0,
-        balRighC:   0,
-        rateLeft:   1.0,
-        rateRigh:   1.015,
-        disbalLeft: m.disbalLeft,
-        disbalRigh: m.disbalRigh,
-        amount:     m.amount,
-        amountC:    m.amountC,     
-        stage:      0,
+        amountC:            100,     
+        stage:              0,
         orderLeftBuy:       '',
         orderRighBuy:       '',
         orderLeftSell:      '',
@@ -312,13 +252,17 @@ async function addMask1() {
         orderRighBuyClosed: false,
         orderLeftSellClosed:false,
         orderRighSellClosed:false,
+        botId:              '',
         procId:             '',
         dealId:             '',
-        maskId:             m._id,
         enabled:            true,
-
+    
     });
-    m.procId = p._id;
+    let p   = new Proc(m);
+    p.botId = m._id; 
+    m.botId = m._id; 
+    m.procId= p._id;
+    p.procId= p._id;
     await p.save(); 
     await m.save();
     console.log(p._id, 'process created');
@@ -338,5 +282,4 @@ module.exports.addDeal          = addDeal;
 module.exports.addMask1         = addMask1;
 module.exports.newClosedOrder   = newClosedOrder;
 module.exports.newClosedOrderPrice   = newClosedOrderPrice;
-
 

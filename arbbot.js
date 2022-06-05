@@ -98,6 +98,11 @@ function setDelay(t) {
 let bot = {};
 let scope;
 let delay = 0;
+let exchanges = [];
+exchanges['wavesdex']   = wavesdex;
+exchanges['binance']    = binance;
+exchanges['gatio']      = gatio;
+
 
 async function botLoop() {
     // set vars
@@ -105,8 +110,8 @@ async function botLoop() {
     let round = 0;
 
     bot = await db.getProcData('62989717feb20f6dcebecc25'); // get proc data ================= 
-    bot.exchLeft = binance;
-    bot.exchRigh = wavesdex; 
+    bot.exchLeft = exchanges['bot.exchangeLeft'];
+    bot.exchRigh = exchanges['bot.exchangeRigh'];
     bot.procId   = bot._id; 
     
     while(bot.stage < 9) {
