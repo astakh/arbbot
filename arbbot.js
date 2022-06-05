@@ -96,10 +96,11 @@ function setDelay(t) {
     if (t == 'buy')  if (scope.buy < 0)  { delay = 2000 - scope.time; } else if (scope.buy < bot.disbalRigh/2)  {delay = 1000 - scope.time} else { delay = 0; }
 }
 let bot = {};
+let scope;
+let delay = 0;
+
 async function botLoop() {
     // set vars
-    let scope;
-    let delay = 0;
     let order;
     let round = 0;
 
