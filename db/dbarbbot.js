@@ -183,6 +183,7 @@ async function newClosedOrderPrice(procId, order, avg) {
 }
 async function addLog(t) {
     let log = new Log({text: t});
+    await func.sendAlert(t);
     console.log(t)
     await log.save();
 }
@@ -219,6 +220,7 @@ async function saveDeal(proc){
         d.orderRighBuyPrice     = proc.orderRighBuyPrice;
         d.endedTime             = func.nowTime();
         await d.save();
+        await func.addLog(`Deal ended with ${d.profit}`);
 
         try {
             d = await Proc.findById(proc.procId);

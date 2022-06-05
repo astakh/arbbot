@@ -1,4 +1,5 @@
 const axios = require('axios');
+require('dotenv').config();
 
 async function getOrdersDirect(exch, amountAsset, priceAsset, volume) {
     let res = {bidPrice: 0, askPrice: 0, avgPrice: 0, time: new Date() };
@@ -53,6 +54,20 @@ async function getOrdersDirect(exch, amountAsset, priceAsset, volume) {
 function nowTime() { let spl = new Date().toISOString().split('T'); return spl[0] + " - " + spl[1]; }
 async function sleep(time) { return new Promise((resolve, reject) => setTimeout(resolve, time)) }
 
+async function sendAlert(text) {
+    const TGBOT_KEY = process.env.TGBOT_KEY;
+    const TGCHAT_ID = process.env.TGCHAT_ID;
+    const URI       = `https://api.telegram.org/bot${TGBOT_KEY}/sendMessage`;
+
+    const d = axios.post(URI, {
+        chat_id:    TGCHAT_ID,
+        parse_mode: 'html',
+        text:       text
+    })
+}
+
+
 module.exports.nowTime          = nowTime;
 module.exports.sleep            = sleep;
 module.exports.getOrdersDirect  = getOrdersDirect;
+module.exports.sendAlert        = sendAlert;
