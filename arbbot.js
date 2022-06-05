@@ -16,38 +16,6 @@ bws.onmessage = (event) => {
 var l = {bidPrice: 0, askPrice: 0, avgPrice: 0};
 const binance   = new ccxt.binance(         { apiKey: process.env.BINANCE_API_KEY,  secret: process.env.BINANCE_API_SECRET });
 const wavesdex  = new ccxt.wavesexchange(   { apiKey: process.env.WAVESDEX_API_KEY, secret: process.env.WAVESDEX_API_SECRET });
-/*let bot = { // 
-    exchLeft:   binance,
-    exchRigh:   wavesdex,
-    pairLeft:   'WAVES/USDT',
-    pairRigh:   'WAVES/USDN',
-    pairLeftA:  'WAVES',
-    pairLeftC:  'USDT',
-    pairRighA:  'WAVES',
-    pairRighC:  'USDN',
-    balLeftA:   0,
-    balLeftC:   0,
-    balRighA:   0,
-    balRighC:   0,
-    rateLeft:   1.0,
-    rateRigh:   1.015,
-    disbalLeft: 0.9,
-    disbalRigh: 0.3,
-    amount:     2,
-    amountC:    100,     
-    stage:      0,
-    orderLeftBuy: '',
-    orderRighBuy: '',
-    orderLeftSell: '',
-    orderRighSell: '',
-    orderLeftBuyPrice: 0,
-    orderRighBuyPrice: 0,
-    orderLeftSellPrice: 0,
-    orderRighSellPrice: 0,
-    dealId: '',
-    procId: '',
-     
-}*/
 
 async function getScopes() {
     let t       = new Date();
@@ -123,6 +91,10 @@ async function setRate() {
     console.log(`USDT/USDN: ${parseFloat((market.avgPrice)/100).toFixed(4)} `);
     return parseFloat(market.avgPrice)/100;
 }
+function setDelay(t) {
+    if (t == 'sell') if (scope.sell < 0) { delay = 2000 - scope.time; } else if (scope.sell < bot.disbalLeft/2) {delay = 1000 - scope.time} else { delay = 0; }
+    if (t == 'buy')  if (scope.buy < 0)  { delay = 2000 - scope.time; } else if (scope.buy < bot.disbalRigh/2)  {delay = 1000 - scope.time} else { delay = 0; }
+}
 let bot = {};
 async function botLoop() {
     // set vars
@@ -142,7 +114,7 @@ async function botLoop() {
         if (bot.stage == 0) { // looking for scope
             if ((round % 25) == 0) { bot.rateRigh = await setRate(); }
             scope = await getScopes();
-            if (scope.sell < 0) { delay = 2000 - scope.time; } else { delay = 0; }
+            setDelay('sell');
             console.log(`Round: ${round} || ${func.nowTime()} || Scope: sell: ${scope.sell.toFixed(4)} || Time: ${scope.time} || timeR:${scope.timeR} || timeL:${scope.timeL}`);
             if (scope.sell > bot.disbalLeft) { // ready to sell from left and buy to right
                 bot.dealId  = await db.addDeal(bot);
@@ -192,7 +164,7 @@ async function botLoop() {
         if (bot.stage == 4) { // looking for scope to sell from right and buy to left 
             if ((round % 25) == 0) { bot.rateRigh = await setRate(); }
             scope = await getScopes();
-            if (scope.buy < 0) { delay = 2000 - scope.time; } else if (scope.buy < 0.2) {delay = 1000 - scope.time} else { delay = 0; }
+            setDelay('buy');
             console.log(`Round: ${round} || ${func.nowTime()} || Scope: buy: ${scope.buy.toFixed(4)} || Time: ${scope.time} || timeR:${scope.timeR} || timeL:${scope.timeL}`);
             if (scope.buy > bot.disbalRigh) { // ready to sell  from right and buy to left
                 bot.stage               = await db.nextStage(bot.procId);
