@@ -115,7 +115,7 @@ async function botLoop() {
             if ((round % 25) == 0) { bot.rateRigh = await setRate(); }
             scope = await getScopes();
             setDelay('sell');
-            console.log(`Round: ${round} || ${func.nowTime()} || Scope: sell: ${scope.sell.toFixed(4)} || Time: ${scope.time} || timeR:${scope.timeR} || timeL:${scope.timeL}`);
+            console.log(`Round: ${round} || ${func.nowTime()} || Scope: sell: ${scope.sell.toFixed(4)} || Scope: buy: ${scope.buy.toFixed(4)} || Time: ${scope.time} || timeR:${scope.timeR} || timeL:${scope.timeL}`);
             if (scope.sell > bot.disbalLeft) { // ready to sell from left and buy to right
                 bot.dealId  = await db.addDeal(bot);
                 bot.orderLeftSellPrice  = scope.bidLeft;
@@ -165,7 +165,7 @@ async function botLoop() {
             if ((round % 25) == 0) { bot.rateRigh = await setRate(); }
             scope = await getScopes();
             setDelay('buy');
-            console.log(`Round: ${round} || ${func.nowTime()} || Scope: buy: ${scope.buy.toFixed(4)} || Time: ${scope.time} || timeR:${scope.timeR} || timeL:${scope.timeL}`);
+            console.log(`Round: ${round} || ${func.nowTime()} || Scope: buy: ${scope.buy.toFixed(4)} || Scope: sell: ${scope.sell.toFixed(4)} || Time: ${scope.time} || timeR:${scope.timeR} || timeL:${scope.timeL}`);
             if (scope.buy > bot.disbalRigh) { // ready to sell  from right and buy to left
                 bot.stage               = await db.nextStage(bot.procId);
                 bot.orderLeftBuyPrice   = scope.askLeft;
