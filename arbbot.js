@@ -101,7 +101,7 @@ let delay = 0;
 let exchanges = [];
 exchanges['wavesdex']   = wavesdex;
 exchanges['binance']    = binance;
-exchanges['gatio']      = gatio;
+//exchanges['gatio']      = gatio;
 
 
 async function botLoop() {
