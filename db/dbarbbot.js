@@ -280,6 +280,5 @@ module.exports.getProcData      = getProcData;
 module.exports.saveDeal         = saveDeal;
 module.exports.addDeal          = addDeal;
 module.exports.addMask1         = addMask1;
-module.exports.newClosedOrder   = newClosedOrder;
-module.exports.newClosedOrderPrice   = newClosedOrderPrice;
+
 
