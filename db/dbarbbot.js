@@ -193,7 +193,7 @@ async function saveDeal(proc){
         d.orderRighBuyPrice     = proc.orderRighBuyPrice;
         d.endedTime             = func.nowTime();
         await d.save();
-        await func.addLog(`Deal ended with ${d.profit}`);
+        await addLog(`Deal closed with ${d.profit.toFixed(2)} profit`);
 
         try {
             d = await Proc.findById(proc.procId);
@@ -214,8 +214,8 @@ async function saveDeal(proc){
 
             await d.save();
             return 0;
-        } catch { return 8; }
-    } catch { return 8; }
+        } catch(err) { await addLog(err); return 8; }
+    } catch(err) { await addLog(err); return 8; }
 } 
 async function addMask1() {
     let m = new Mask({
