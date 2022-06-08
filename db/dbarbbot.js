@@ -183,7 +183,7 @@ async function saveDeal(proc){
         d.amount                = proc.amount;
         d.amountC               = proc.amountC;
         d.profit                = (proc.orderLeftSellPrice - proc.orderLeftBuyPrice + proc.orderRighSellPrice - proc.orderRighBuyPrice) * proc.amount;
-        d.profit                = d.profit - (proc.orderLeftBuyPrice * proc.amount) * (0.005 * 2 + 0.00075 * 2 );
+        d.profit                = d.profit - (proc.orderLeftBuyPrice * proc.amount) * (0.0005 * 2 + 0.00075 * 2 );
         d.orderLeftBuy          = proc.orderLeftBuy;
         d.orderLeftSell         = proc.orderLeftSell;
         d.orderRighSell         = proc.orderRighSell;
