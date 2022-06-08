@@ -319,11 +319,17 @@ async function botLoop() {
     let bot         = {};
     let bots        = [];
     
-    bot = await db.getProcData('629dc9053b0a24a698d02fb9'); // get proc data ================= 
+    bot = await db.getProcData('62a03ea9527695861f98d6f7'); // get proc data ================= 
     bot.exchLeft    = exchanges[bot.exchangeLeft];
     bot.exchRigh    = exchanges[bot.exchangeRigh];
     bot.nextTime    = Date.now();
     bots[0]         = bot; 
+    bot = await db.getProcData('62a03eef9dbb07ddbd54bb85'); // get proc data ================= 
+    bot.exchLeft    = exchanges[bot.exchangeLeft];
+    bot.exchRigh    = exchanges[bot.exchangeRigh];
+    bot.nextTime    = Date.now();
+    bots[1]         = bot; 
+    console.log(`Having ${bots.length} bots..`);
     
 
     let rateTime     = 0;

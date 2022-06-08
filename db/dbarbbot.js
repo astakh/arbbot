@@ -220,9 +220,9 @@ async function saveDeal(proc){
 } 
 async function addMask1() {
     let m = new Mask({
-        strategy:   'G/W-arbitrTEST',
+        strategy:   'G/W-arb 0.6',
         procType:   'xxx/waves',
-        exchangeLeft:   'gateio',
+        exchangeLeft:   'binance',
         exchangeRigh:   'wavesdex',
         pairLeft:   'WAVES/USDT',
         pairRigh:   'WAVES/USDN',
@@ -236,9 +236,9 @@ async function addMask1() {
         balRighC:   0,
         rateLeft:   1.0,
         rateRigh:   1.015,
-        disbalLeft: 0.3,
-        disbalRigh: 0.3,
-        amount:     2,
+        disbalLeft: 0.6,
+        disbalRigh: 0.6,
+        amount:     35,
         amountC:            100,     
         stage:              0,
         orderLeftBuy:       '',
