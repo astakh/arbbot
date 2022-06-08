@@ -1,25 +1,113 @@
-const ccxt = require ('ccxt');
+const ccxt  = require ('ccxt');
 const axios = require ('axios');
 const db    = require('./db/dbarbbot');
+const wd    = require('./wavesmatcher');
 const func  = require('./functions');
 require('dotenv').config();
 const WebSocket = require('ws');
 let bws = new WebSocket('wss://stream.binance.com:9443/ws/wavesusdt@bookTicker');
+//let gws = new WebSocket('wss://api.gateio.ws/ws/v4/');
 
+let wavesUsdtPrice      = {};
+wavesUsdtPrice.binance  = {};
+wavesUsdtPrice.gateio   = {};
 bws.onmessage = (event) => {
     let sockObj = JSON.parse(event.data);
-    l.bidPrice = parseFloat(sockObj.b);
-    l.askPrice = parseFloat(sockObj.a);
-    l.avgPrice = (l.bidPrice + l.askPrice) / 2;
+    wavesUsdtPrice.binance.bidPrice = parseFloat(sockObj.b);
+    wavesUsdtPrice.binance.askPrice = parseFloat(sockObj.a);
+    wavesUsdtPrice.binance.avgPrice = (wavesUsdtPrice.binance.bidPrice + wavesUsdtPrice.binance.askPrice) / 2;
     //console.log(`WAVESUSDT bid: ${sockObj.b}, ask: ${sockObj.a}`);
 }
+var socketGateio = new WebSocket('wss://ws.gate.io/v3');
+socketGateio.onopen = function () {
+    console.log("Connected to gate.io websocket");
+    const params = ["WAVES_USDT", 20, "0.0001"];
+    var msg = {
+        id:     11111,
+        method: 'depth.subscribe',
+        params: params
+    };
+    socketGateio.send(JSON.stringify(msg));
+};
+
+socketGateio.onmessage = function (e) { 
+    let asks    = wavesUsdtPrice.gateio.asks;
+    let bids    = wavesUsdtPrice.gateio.bids;
+    let r       = JSON.parse(e.data);
+    let params  = [];
+    let newAsks = [];
+    let d       = [];
+
+    if (r.params) {
+        params = r.params;
+        if (params[0]) {
+            asks = func.toFloat(params[1].asks);
+            bids = func.toFloat(params[1].bids);
+            //console.log(asks, bids);
+        }
+        else {
+            if (params[1].asks){
+                newAsks = func.toFloat(params[1].asks)
+                newAsks.forEach(newElement => {
+                    for (var i = 0; i < asks.length; i++) {
+                        if (newElement[1] == 0 ) {
+                            d = asks.splice(i, 1);
+                            break;
+                        }
+                        else {
+                            if (newElement[0] <= asks[i][0]) {
+                                d = asks.splice(i, 0, newElement);
+                                break;
+                            }
+                        }
+                    }
+                });
+            }
+            if (params[1].bids){
+                newBids = func.toFloat(params[1].bids)
+                newBids.forEach(newElement => {
+                    for (var i = 0; i < bids.length; i++) {
+                        if (newElement[1] == 0 ) {
+                            d = bids.splice(i, 1);
+                            break;
+                        }
+                        else {
+                            if (newElement[0] >= bids[i][0]) {
+                                d = bids.splice(i, 0, newElement);
+                                break;
+                            }
+                        }
+                    }
+                });
+            }
+        }
+        wavesUsdtPrice.gateio.asks = asks;
+        wavesUsdtPrice.gateio.bids = bids;
+        let vol     = 0;
+        for (var i  = 0; i < bids.length; i++ ) {
+            vol += bids[i][1];
+            if (vol > 100) { wavesUsdtPrice.gateio.bidPrice = bids[i][0]; break; }
+        }
+        vol = 0;
+        for (var i = 0; i < asks.length; i++ ) {
+            vol += asks[i][1];
+            if (vol > 100) { wavesUsdtPrice.gateio.askPrice = asks[i][0]; break; }
+        }
+        wavesUsdtPrice.gateio.avgPrice    = (wavesUsdtPrice.gateio.bidPrice+wavesUsdtPrice.gateio.askPrice)/2;
+
+    }
+    
+}
+
 var l = {bidPrice: 0, askPrice: 0, avgPrice: 0};
 const binance   = new ccxt.binance(         { apiKey: process.env.BINANCE_API_KEY,  secret: process.env.BINANCE_API_SECRET });
 const wavesdex  = new ccxt.wavesexchange(   { apiKey: process.env.WAVESDEX_API_KEY, secret: process.env.WAVESDEX_API_SECRET });
+const gateio    = new ccxt.gateio(          { apiKey: process.env.GATEIO_API_KEY, secret: process.env.GATEIO_API_SECRET });
 
-async function getScopes() {
+
+async function getScopes(bot) {
     let t       = new Date();
-    //const l     = await func.getOrdersDirect('binance', 'WAVES', 'USDT', bot.amount);
+    const l     = wavesUsdtPrice[bot.exchangeLeft];
     const r     = await func.getOrdersDirect('wavesdex', 'WAVES', 'DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p', bot.amount);
     //console.log('getScopes: ', bot.pairRigh, bot.amount);
     let res     = {}; 
@@ -65,13 +153,27 @@ async function getBalances() {
 }
 async function placeOrder(exch, pair, orderType, orderDirection, amount, price) {
     let res = {};
-    try {
-        const order = await exch.createOrder(pair, orderType, orderDirection, amount, price);
+    if (exch == wavesdex) {
+        console.log('try to place waves order')
+        let order = await wd.placeWavesOrder('WAVES', 'DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p', amount, price, orderDirection);
+        order       = await getOrder(exch, order.id, pair);
         res.success = true;
         res.order   = order;
+        res.price   = order.price;
         res.id      = order.id;
+
     }
-    catch(err) { res.success=false;  res.error=err; }
+    else {
+        try {
+            let order   = await exch.createOrder(pair, orderType, orderDirection, amount, price);
+            order       = await getOrder(exch, order.id, pair);
+            res.success = true;
+            res.order   = order;
+            res.price   = order.price;
+            res.id      = order.id;
+        }
+        catch(err) { res.success=false;  res.error=err; }
+    }
     return res;
 }
 async function getOrder(exch, id, pair) {
@@ -81,6 +183,8 @@ async function getOrder(exch, id, pair) {
         res.success = true;
         res.order   = order;
         res.id      = order.id;
+        res.price   = order.price;
+        res.average = order.average;
         res.status  = order.status;
     }
     catch(err) { res.success=false;  res.error=err; }
@@ -91,37 +195,28 @@ async function setRate() {
     console.log(`USDT/USDN: ${parseFloat((market.avgPrice)/100).toFixed(4)} `);
     return parseFloat(market.avgPrice)/100;
 }
-function setDelay(t) {
-    if (t == 'sell') if (scope.sell < 0) { delay = 2000 - scope.time; } else if (scope.sell < bot.disbalLeft/2) {delay = 1000 - scope.time} else { delay = 0; }
-    if (t == 'buy')  if (scope.buy < 0)  { delay = 2000 - scope.time; } else if (scope.buy < bot.disbalRigh/2)  {delay = 1000 - scope.time} else { delay = 0; }
+function setDelay(bot, scope, direction) {
+    let delay = 0;
+    if (direction == 'sell') if (scope.sell < 0) { delay = 2000; } else if (scope.sell < bot.disbalLeft/2) {delay = 1000; } 
+    if (direction == 'buy')  if (scope.buy < 0)  { delay = 2000; } else if (scope.buy < bot.disbalRigh/2)  {delay = 1000; }
+    return delay;
 }
-let bot = {};
-let scope;
-let delay = 0;
-let exchanges = [];
+let scope       = {};
+let exchanges   = [];
+let usdtusdnRate= 1; 
+let order;
+
 exchanges['wavesdex']   = wavesdex;
 exchanges['binance']    = binance;
-//exchanges['gatio']      = gatio;
+exchanges['gateio']     = gateio;
 
-
-async function botLoop() {
-    // set vars
-    let order;
-    let round = 0;
-
-    bot = await db.getProcData('62989717feb20f6dcebecc25'); // get proc data ================= 
-    bot.exchLeft = exchanges[bot.exchangeLeft];
-    bot.exchRigh = exchanges[bot.exchangeRigh];
-    bot.procId   = bot._id; 
-    
-    while(bot.stage < 9) {
-    //while(false) {
-
+async function doWBot(bot) { 
+    if (bot.nextTime < Date.now()) {
         if (bot.stage == 0) { // looking for scope
-            if ((round % 25) == 0) { bot.rateRigh = await setRate(); }
-            scope = await getScopes();
-            setDelay('sell');
-            console.log(`Round: ${round} || ${func.nowTime()} || Scope: sell: ${scope.sell.toFixed(4)} || Scope: buy: ${scope.buy.toFixed(4)} || Time: ${scope.time} || timeR:${scope.timeR} || timeL:${scope.timeL}`);
+            bot.rateRigh = usdtusdnRate; 
+            scope = await getScopes(bot);
+            bot.nextTime += setDelay(bot, scope, 'sell'); 
+            console.log(`${bot.strategy} || ${func.nowTime()} || Scope: sell: ${scope.sell.toFixed(2)} || Scope: buy: ${scope.buy.toFixed(2)} || Time: ${scope.time}`);
             if (scope.sell > bot.disbalLeft) { // ready to sell from left and buy to right
                 bot.dealId  = await db.addDeal(bot);
                 bot.orderLeftSellPrice  = scope.bidLeft;
@@ -133,7 +228,7 @@ async function botLoop() {
         if (bot.stage == 1) { // try to place order to left sell
             order = await placeOrder(bot.exchLeft, bot.pairLeft, 'limit', 'sell', bot.amount, bot.orderLeftSellPrice);
             if (order.success) {
-                await       db.addLog(`Sell order ${order.id} placed`);
+                await       db.addLog(`${bot.strategy}:${bot.stage}: Sell order ${order.id} placed`);
                 bot         = await db.saveOrder(bot, 'orderLeftSell', order);
                 bot.stage   = await db.nextStage(bot.procId);
             } else          {console.log(order.error)}
@@ -141,7 +236,7 @@ async function botLoop() {
         if (bot.stage == 2) { // try to place order to right buy
             order = await placeOrder(bot.exchRigh, bot.pairRigh, 'limit', 'buy', bot.amount, bot.orderRighBuyPrice * 1.01);
             if (order.success) {
-                await       db.addLog(`Buy order ${order.id} placed`);
+                await       db.addLog(`${bot.strategy}:${bot.stage}: Buy order ${order.id} placed`);
                 bot         = await db.saveOrder(bot, 'orderRighBuy', order);
                 bot.stage   = await db.nextStage(bot.procId);
             } else          {console.log(order.error)}
@@ -168,10 +263,10 @@ async function botLoop() {
             } else { console.log(`leftSell: ${bot.orderLeftSellClosed} || right Buy ${bot.orderRighBuyClosed}`)}
         }
         if (bot.stage == 4) { // looking for scope to sell from right and buy to left 
-            if ((round % 25) == 0) { bot.rateRigh = await setRate(); }
-            scope = await getScopes();
-            setDelay('buy');
-            console.log(`Round: ${round} || ${func.nowTime()} || Scope: buy: ${scope.buy.toFixed(4)} || Scope: sell: ${scope.sell.toFixed(4)} || Time: ${scope.time} || timeR:${scope.timeR} || timeL:${scope.timeL}`);
+            bot.rateRigh = usdtusdnRate; 
+            scope = await getScopes(bot);
+            bot.nextTime += setDelay(bot, scope, 'buy');
+            console.log(`${bot.strategy} || ${func.nowTime()} || Scope: buy: ${scope.buy.toFixed(2)} || Scope: sell: ${scope.sell.toFixed(2)} || Time: ${scope.time}`);
             if (scope.buy > bot.disbalRigh) { // ready to sell  from right and buy to left
                 bot.stage               = await db.nextStage(bot.procId);
                 bot.orderLeftBuyPrice   = scope.askLeft;
@@ -180,18 +275,19 @@ async function botLoop() {
         }
         if (bot.stage == 5) { // try to place order to left buy
             order = await placeOrder(bot.exchLeft, bot.pairLeft, 'limit', 'buy', bot.amount, bot.orderLeftBuyPrice);
+            //console.log(order);
             if (order.success) {
-                await               db.addLog(`Buy order ${order.id} placed`);
+                await       db.addLog(`${bot.strategy}:${bot.stage}: Buy order ${order.id} placed`);
                 bot         = await db.saveOrder(bot, 'orderLeftBuy', order);
-                bot.stage           = await db.nextStage(bot.procId);
+                bot.stage   = await db.nextStage(bot.procId);
             } else                  {console.log(order.error)}
         }
         if (bot.stage == 6) { // try to place order to right sell
             order = await placeOrder(bot.exchRigh, bot.pairRigh, 'limit', 'sell', bot.amount, bot.orderRighSellPrice / 1.01);
             if (order.success) {
-                await               db.addLog(`Sell order ${order.id} placed`);
+                await       db.addLog(`${bot.strategy}:${bot.stage}: Sell order ${order.id} placed`);
                 bot         = await db.saveOrder(bot, 'orderRighSell', order);
-                bot.stage           = await db.nextStage(bot.procId);
+                bot.stage   = await db.nextStage(bot.procId);
             } else                  {console.log(order.error)}
         }
         if (bot.stage == 7) { // ?are orders closed 
@@ -215,10 +311,32 @@ async function botLoop() {
             console.log('trying to save deal: ', bot.dealId);
             bot.stage = await db.saveDeal(bot); 
         }
+    }
+    return bot;
+}
 
+async function botLoop() { 
+    let bot         = {};
+    let bots        = [];
+    
+    bot = await db.getProcData('629dc9053b0a24a698d02fb9'); // get proc data ================= 
+    bot.exchLeft    = exchanges[bot.exchangeLeft];
+    bot.exchRigh    = exchanges[bot.exchangeRigh];
+    bot.nextTime    = Date.now();
+    bots[0]         = bot; 
+    
 
-        round++;
-        await func.sleep(delay);
+    let rateTime     = 0;
+    while(true) {
+        if (rateTime < Date.now()) { usdtusdnRate = await setRate(); rateTime = Date.now() + 30*1000; }
+
+        for (var i = 0; i < bots.length; i++ ) {
+            bots[i] = await doWBot(bots[i]);
+        }
+        
+
+        //round++;
+        //await func.sleep(delay);
     
     }
 }

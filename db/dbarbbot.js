@@ -104,7 +104,7 @@ async function nextStage(procId) {
     }
     else {
         s.stage     = s.stage + 1; 
-        await addLog(`Next stage: ${s.stage}`);
+        //await addLog(`Next stage: ${s.stage}`);
     }
     await s.save();
     return s.stage;
@@ -114,15 +114,15 @@ async function saveOrder(bot, orderType, order) {
     if (bot[orderType] == '') { 
         proc[orderType] = order.id;
         bot[orderType]  = order.id;
-        await addLog(`${orderType} ${order.id} with price ${order.order.price.toFixed(4)} added`);
+        await addLog(`${orderType} ${order.id} with price ${order.price.toFixed(4)} added`);
         await proc.save();
     }
-    if (order.order.status == 'closed') {
-        proc[orderType + 'Price']   = order.order.average;
+    if (order.status == 'closed') {
+        proc[orderType + 'Price']   = order.average;
         proc[orderType + 'Closed']  = true;
-        bot[orderType + 'Price']    = order.order.average;
+        bot[orderType + 'Price']    = order.average;
         bot[orderType + 'Closed']   = true;
-        await addLog(`${orderType} ${order.id} with price ${order.order.average.toFixed(4)} closed`);
+        await addLog(`${orderType} ${order.id} with price ${order.average.toFixed(4)} closed`);
         await proc.save();
     }
     return bot;
@@ -182,7 +182,8 @@ async function saveDeal(proc){
         let d = await Deal.findById(proc.dealId);
         d.amount                = proc.amount;
         d.amountC               = proc.amountC;
-        d.profit                = (proc.orderLeftSellPrice - proc.orderLeftBuyPrice + proc.orderRighSellPrice - proc.orderRighBuyPrice) * proc.amount - (proc.orderLeftBuyPrice * 4 * 0.001);
+        d.profit                = (proc.orderLeftSellPrice - proc.orderLeftBuyPrice + proc.orderRighSellPrice - proc.orderRighBuyPrice) * proc.amount;
+        d.profit                = d.profit - (proc.orderLeftBuyPrice * proc.amount) * (0.005 * 2 + 0.00075 * 2 );
         d.orderLeftBuy          = proc.orderLeftBuy;
         d.orderLeftSell         = proc.orderLeftSell;
         d.orderRighSell         = proc.orderRighSell;
@@ -219,9 +220,9 @@ async function saveDeal(proc){
 } 
 async function addMask1() {
     let m = new Mask({
-        strategy:   'B/W-arbitrTEST',
+        strategy:   'G/W-arbitrTEST',
         procType:   'xxx/waves',
-        exchangeLeft:   'binance',
+        exchangeLeft:   'gateio',
         exchangeRigh:   'wavesdex',
         pairLeft:   'WAVES/USDT',
         pairRigh:   'WAVES/USDN',
@@ -235,8 +236,8 @@ async function addMask1() {
         balRighC:   0,
         rateLeft:   1.0,
         rateRigh:   1.015,
-        disbalLeft: 0.9,
-        disbalRigh: 0.9,
+        disbalLeft: 0.3,
+        disbalRigh: 0.3,
         amount:     2,
         amountC:            100,     
         stage:              0,

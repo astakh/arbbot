@@ -49,8 +49,37 @@ async function getOrdersDirect(exch, amountAsset, priceAsset, volume) {
     
     
     }
+    if (exch == 'gateio')  { 
+        apireq = 'https://api.gateio.ws/api/v4/spot/order_book?limit=20&currency_pair=' + amountAsset + '_' + priceAsset; 
+        try {
+            const result = await axios.get(apireq);
+            const bookW       = result.data;
+            let vol     = 0;
+            for (var i  = 0; i < 20; i++ ) {
+                vol += parseFloat(bookW.bids[i][1]);
+                if (vol > volume) { res.bidPrice = parseFloat(bookW.bids[i][0]); break; }
+            }
+            vol = 0;
+            for (var i = 0; i < 20; i++ ) {
+                vol += parseFloat(bookW.asks[i][1]);
+                if (vol > volume) { res.askPrice = parseFloat(bookW.asks[i][0]); break; }
+            }
+            res.avgPrice    = (res.bidPrice+res.askPrice)/2;
+            res.time        = new Date() - res.time;
+            return res;
+        } catch(err) {  console.log(err); } 
+    }
+
 
 }
+function toFloat(a) {
+    a.forEach(element => {
+        element[0] = parseFloat(element[0]);
+        element[1] = parseFloat(element[1]);
+    });
+    return a;
+}
+
 function nowTime() { let spl = new Date().toISOString().split('T'); return spl[0] + " - " + spl[1]; }
 async function sleep(time) { return new Promise((resolve, reject) => setTimeout(resolve, time)) }
 
@@ -71,3 +100,4 @@ module.exports.nowTime          = nowTime;
 module.exports.sleep            = sleep;
 module.exports.getOrdersDirect  = getOrdersDirect;
 module.exports.sendAlert        = sendAlert;
+module.exports.toFloat          = toFloat;

@@ -10,11 +10,14 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@waves/waves-transactions": "^4.2.5-beta.3",
     "axios": "^0.27.2",
     "ccxt": "^1.84.42",
     "dotenv": "^16.0.1",
+    "kucoin-websocket-api": "^0.2.3",
     "mongodb": "^4.6.0",
     "mongoose": "^6.3.5",
+    "node-fetch": "^2.6.7",
     "ws": "^8.7.0"
   }
 }
