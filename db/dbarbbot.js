@@ -15,6 +15,7 @@ mongoose
     const maskSchema = new Schema ({
         enabled:            { type: Boolean,},
         stage:              { type: Number, },
+        profit:             { type: Number, },
         exchangeLeft:       { type: String, },
         exchangeRigh:       { type: String, },
         strategy:           { type: String, },
@@ -33,9 +34,13 @@ mongoose
         rateRigh:           { type: Number, },
         disbalLeft:         { type: Number, },
         disbalRigh:         { type: Number, },
+        disbalRebal:        { type: Number, },
         amount:             { type: Number, },
         amountC:            { type: Number, },
         stage:              { type: Number, },
+        orderUsdtUsdn:      { type: String, },
+        orderUsdtUsdnClosed:{ type: Boolean,},
+        orderUsdtUsdnPrice: { type: Number, },
         orderLeftBuy:       { type: String, },
         orderRighBuy:       { type: String, },
         orderLeftSell:      { type: String, },
@@ -109,50 +114,47 @@ async function nextStage(procId) {
     await s.save();
     return s.stage;
 }
+async function setStage(procId, nextStage) {
+    let proc    = await Proc.findById(procId);
+    proc.stage  = nextStage;
+    if (nextStage == 6) { proc.profit -= 0.6; }
+    if (nextStage == 7) { proc.profit -= 0.001 * 10; }
+    if (nextStage == 10) { proc.profit -= proc.amountC * 0.0005; }
+    await proc.save();
+    await addLog(`${proc.strategy} stage ${proc.stage}`)
+    return nextStage;
+}
 async function saveOrder(bot, orderType, order) {
     let proc    = await Proc.findById(bot.procId);
-    if (bot[orderType] == '') { 
-        proc[orderType] = order.id;
-        bot[orderType]  = order.id;
-        await addLog(`${orderType} ${order.id} with price ${order.price.toFixed(4)} added`);
-        await proc.save();
-    }
     if (order.status == 'closed') {
         proc[orderType + 'Price']   = order.average;
         proc[orderType + 'Closed']  = true;
         bot[orderType + 'Price']    = order.average;
         bot[orderType + 'Closed']   = true;
-        await addLog(`${orderType} ${order.id} with price ${order.average.toFixed(4)} closed`);
+        let fee = 0; let k = 1;
+        if (orderType.indexOf('orderUsdtUsdn') == -1) {
+            if (orderType.indexOf('Left') > -1) { fee = 0.00075; }
+            else                                { fee = 0.0005;  k = bot.rateRigh}
+            console.log(proc.profit, order.average, proc.amount, fee)
+            if (orderType.indexOf('Sell') > -1) { proc.profit += proc.amount * order.average * (1 - fee) / k; }
+            else                                { proc.profit -= proc.amount * order.average * (1 + fee) / k; }
+        }
+        
+        await addLog(`${proc.strategy}:${orderType} with price ${order.average.toFixed(2)} closed`);
         await proc.save();
     }
     return bot;
 }
-async function newOrder(procId, order, id) {
-    let proc    = await Proc.findById(procId);
-    if (order == 'orderLeftBuy')    { proc.orderLeftBuy     = id; }
-    if (order == 'orderLeftSell')   { proc.orderLeftSell    = id; }
-    if (order == 'orderRighBuy')    { proc.orderRighBuy     = id; }
-    if (order == 'orderRighSell')   { proc.orderRighSell    = id; }
+async function newOrder(bot, orderType, order) {
+    let proc    = await Proc.findById(bot.procId);
+    proc[orderType] = order.id;
+    bot[orderType]  = order.id;
+    proc[orderType + 'Price']   = bot[orderType + 'Price'];
+    proc[orderType + 'Closed']  = false;
+    bot[orderType + 'Closed']   = false;
+    await addLog(`${proc.strategy}:${orderType} with price ${order.price.toFixed(2)} placed`);
     await proc.save();
-    return id;
-}
-async function newClosedOrder(procId, order) {
-    let proc    = await Proc.findById(procId);
-    if (order == 'orderLeftBuy')    { proc.orderLeftBuyClosed  = true; }
-    if (order == 'orderLeftSell')   { proc.orderLeftSellClosed = true; }
-    if (order == 'orderRighBuy')    { proc.orderRighBuyClosed  = true; }
-    if (order == 'orderRighSell')   { proc.orderRighSellClosed = true; }
-    await proc.save();
-    return true;
-}
-async function newClosedOrderPrice(procId, order, avg) {
-    let proc    = await Proc.findById(procId);
-    if (order == 'orderLeftBuy')    { proc.orderLeftBuyPrice     = avg; }
-    if (order == 'orderLeftSell')   { proc.orderLeftSellPrice    = avg; }
-    if (order == 'orderRighBuy')    { proc.orderRighBuyPrice     = avg; }
-    if (order == 'orderRighSell')   { proc.orderRighSellPrice    = avg; }
-    await proc.save();
-    return avg;
+    return bot;
 }
 async function addLog(t) {
     let log = new Log({text: t});
@@ -164,17 +166,18 @@ async function addScope(s, b) {
     let log = new Scope({buy: b, sell: s}); 
     await log.save();
 }
-
 async function getProcData(procId){
     let p = await Proc.findById(procId);
     return p;
 }
 async function addDeal(bot) {
-    let d       = new Deal({procId: bot.procId, amount: bot.amount, startTime: func.nowTime()});
+    let d       = new Deal({procId: bot.procId, profit: 0, amount: bot.amount, startTime: func.nowTime()});
     await       d.save();
     let p       = await Proc.findById(bot.procId);
     p.dealId    = d._id;
+    p.amount    = bot.amount;
     await       p.save();
+    await       addLog(`${bot.strategy} Deal started with amount ${bot.amount}`)
     return      d._id;
 }
 async function saveDeal(proc){ 
@@ -182,8 +185,7 @@ async function saveDeal(proc){
         let d = await Deal.findById(proc.dealId);
         d.amount                = proc.amount;
         d.amountC               = proc.amountC;
-        d.profit                = (proc.orderLeftSellPrice - proc.orderLeftBuyPrice + proc.orderRighSellPrice - proc.orderRighBuyPrice) * proc.amount;
-        d.profit                = d.profit - (proc.orderLeftBuyPrice * proc.amount) * (0.0005 * 2 + 0.00075 * 2 );
+        d.profit                = proc.profit;
         d.orderLeftBuy          = proc.orderLeftBuy;
         d.orderLeftSell         = proc.orderLeftSell;
         d.orderRighSell         = proc.orderRighSell;
@@ -194,11 +196,12 @@ async function saveDeal(proc){
         d.orderRighBuyPrice     = proc.orderRighBuyPrice;
         d.endedTime             = func.nowTime();
         await d.save();
-        await addLog(`Deal closed with ${d.profit.toFixed(2)} profit`);
+        await addLog(`${proc.strategy}:Deal closed with ${d.profit.toFixed(2)} profit`);
 
         try {
             d = await Proc.findById(proc.procId);
             d.stage                 = 0;
+            d.profit                = 0;
             d.orderLeftBuy          = '';
             d.orderLeftSell         = '';
             d.orderRighSell         = '';
@@ -220,8 +223,9 @@ async function saveDeal(proc){
 } 
 async function addMask1() {
     let m = new Mask({
-        strategy:   'G/W-arb 0.6',
-        procType:   'xxx/waves',
+        strategy:   'RB3 4/6',
+        profit:     0,
+        procType:   'rebalance1',
         exchangeLeft:   'binance',
         exchangeRigh:   'wavesdex',
         pairLeft:   'WAVES/USDT',
@@ -236,10 +240,11 @@ async function addMask1() {
         balRighC:   0,
         rateLeft:   1.0,
         rateRigh:   1.015,
-        disbalLeft: 0.6,
-        disbalRigh: 0.6,
-        amount:     35,
-        amountC:            100,     
+        disbalLeft:         0.4,
+        disbalRigh:         0.4,
+        disbalRebal:        0.6,
+        amount:             0,
+        amountC:            300,     
         stage:              0,
         orderLeftBuy:       '',
         orderRighBuy:       '',
@@ -249,6 +254,9 @@ async function addMask1() {
         orderRighBuyPrice:  0,
         orderLeftSellPrice: 0,
         orderRighSellPrice: 0,
+        orderUsdtUsdn:      '',
+        orderUsdtUsdnClosed:false,
+        orderUsdtUsdnPrice: 0,
         orderLeftBuyClosed: false,
         orderRighBuyClosed: false,
         orderLeftSellClosed:false,
@@ -273,6 +281,7 @@ async function addMask1() {
 
 module.exports.lastAction       = lastAction;
 module.exports.nextStage        = nextStage;
+module.exports.setStage         = setStage;
 module.exports.addLog           = addLog;
 module.exports.addScope         = addScope;
 module.exports.newOrder         = newOrder;

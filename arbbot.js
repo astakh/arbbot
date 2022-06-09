@@ -7,10 +7,12 @@ require('dotenv').config();
 const WebSocket = require('ws');
 let bws = new WebSocket('wss://stream.binance.com:9443/ws/wavesusdt@bookTicker');
 //let gws = new WebSocket('wss://api.gateio.ws/ws/v4/');
+const bin_waves_dep_adr = process.env.BINANCE_WAVES_DEPOSIT_ADDRESS;
+const wav_usdt_dep_adr  = process.env.WAVESDEX_USDT_DEPOSIT_ADDRESS;
 
 let wavesUsdtPrice      = {};
 wavesUsdtPrice.binance  = {};
-wavesUsdtPrice.gateio   = {};
+//wavesUsdtPrice.gateio   = {};
 bws.onmessage = (event) => {
     let sockObj = JSON.parse(event.data);
     wavesUsdtPrice.binance.bidPrice = parseFloat(sockObj.b);
@@ -18,91 +20,10 @@ bws.onmessage = (event) => {
     wavesUsdtPrice.binance.avgPrice = (wavesUsdtPrice.binance.bidPrice + wavesUsdtPrice.binance.askPrice) / 2;
     //console.log(`WAVESUSDT bid: ${sockObj.b}, ask: ${sockObj.a}`);
 }
-var socketGateio = new WebSocket('wss://ws.gate.io/v3');
-socketGateio.onopen = function () {
-    console.log("Connected to gate.io websocket");
-    const params = ["WAVES_USDT", 20, "0.0001"];
-    var msg = {
-        id:     11111,
-        method: 'depth.subscribe',
-        params: params
-    };
-    socketGateio.send(JSON.stringify(msg));
-};
-
-socketGateio.onmessage = function (e) { 
-    let asks    = wavesUsdtPrice.gateio.asks;
-    let bids    = wavesUsdtPrice.gateio.bids;
-    let r       = JSON.parse(e.data);
-    let params  = [];
-    let newAsks = [];
-    let d       = [];
-
-    if (r.params) {
-        params = r.params;
-        if (params[0]) {
-            asks = func.toFloat(params[1].asks);
-            bids = func.toFloat(params[1].bids);
-            //console.log(asks, bids);
-        }
-        else {
-            if (params[1].asks){
-                newAsks = func.toFloat(params[1].asks)
-                newAsks.forEach(newElement => {
-                    for (var i = 0; i < asks.length; i++) {
-                        if (newElement[1] == 0 ) {
-                            d = asks.splice(i, 1);
-                            break;
-                        }
-                        else {
-                            if (newElement[0] <= asks[i][0]) {
-                                d = asks.splice(i, 0, newElement);
-                                break;
-                            }
-                        }
-                    }
-                });
-            }
-            if (params[1].bids){
-                newBids = func.toFloat(params[1].bids)
-                newBids.forEach(newElement => {
-                    for (var i = 0; i < bids.length; i++) {
-                        if (newElement[1] == 0 ) {
-                            d = bids.splice(i, 1);
-                            break;
-                        }
-                        else {
-                            if (newElement[0] >= bids[i][0]) {
-                                d = bids.splice(i, 0, newElement);
-                                break;
-                            }
-                        }
-                    }
-                });
-            }
-        }
-        wavesUsdtPrice.gateio.asks = asks;
-        wavesUsdtPrice.gateio.bids = bids;
-        let vol     = 0;
-        for (var i  = 0; i < bids.length; i++ ) {
-            vol += bids[i][1];
-            if (vol > 100) { wavesUsdtPrice.gateio.bidPrice = bids[i][0]; break; }
-        }
-        vol = 0;
-        for (var i = 0; i < asks.length; i++ ) {
-            vol += asks[i][1];
-            if (vol > 100) { wavesUsdtPrice.gateio.askPrice = asks[i][0]; break; }
-        }
-        wavesUsdtPrice.gateio.avgPrice    = (wavesUsdtPrice.gateio.bidPrice+wavesUsdtPrice.gateio.askPrice)/2;
-
-    }
-    
-}
-
 var l = {bidPrice: 0, askPrice: 0, avgPrice: 0};
 const binance   = new ccxt.binance(         { apiKey: process.env.BINANCE_API_KEY,  secret: process.env.BINANCE_API_SECRET });
 const wavesdex  = new ccxt.wavesexchange(   { apiKey: process.env.WAVESDEX_API_KEY, secret: process.env.WAVESDEX_API_SECRET });
-const gateio    = new ccxt.gateio(          { apiKey: process.env.GATEIO_API_KEY, secret: process.env.GATEIO_API_SECRET });
+//const gateio    = new ccxt.gateio(          { apiKey: process.env.GATEIO_API_KEY, secret: process.env.GATEIO_API_SECRET });
 
 
 async function getScopes(bot) {
@@ -154,8 +75,11 @@ async function getBalances() {
 async function placeOrder(exch, pair, orderType, orderDirection, amount, price) {
     let res = {};
     if (exch == wavesdex) {
-        console.log('try to place waves order')
-        let order = await wd.placeWavesOrder('WAVES', 'DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p', amount, price, orderDirection);
+        console.log('try to place waves order');
+        let order;
+        if (pair == 'WAVES/USDN')   { order = await wd.placeWAVESUSDNOrder(amount, price, orderDirection); }
+        if (pair == 'USDT/USDN')    { order = await wd.placeUSDTUSDNOrder(amount, price, orderDirection); }
+        
         order       = await getOrder(exch, order.id, pair);
         res.success = true;
         res.order   = order;
@@ -208,9 +132,9 @@ let order;
 
 exchanges['wavesdex']   = wavesdex;
 exchanges['binance']    = binance;
-exchanges['gateio']     = gateio;
+//exchanges['gateio']     = gateio;
 
-async function doWBot(bot) { 
+async function doRebalanceBot(bot) { 
     if (bot.nextTime < Date.now()) {
         if (bot.stage == 0) { // looking for scope
             bot.rateRigh = usdtusdnRate; 
@@ -218,27 +142,28 @@ async function doWBot(bot) {
             bot.nextTime += setDelay(bot, scope, 'sell'); 
             console.log(`${bot.strategy} || ${func.nowTime()} || Scope: sell: ${scope.sell.toFixed(2)} || Scope: buy: ${scope.buy.toFixed(2)} || Time: ${scope.time}`);
             if (scope.sell > bot.disbalLeft) { // ready to sell from left and buy to right
-                bot.dealId  = await db.addDeal(bot);
                 bot.orderLeftSellPrice  = scope.bidLeft;
                 bot.orderRighBuyPrice   = scope.askRigh;
-                bot.stage   = await db.nextStage(bot.procId);
-                await db.addLog(`Deal started`)
+                bot.amount  = parseInt(bot.amountC / bot.orderLeftSellPrice) / 1;
+                bot.stage   = await db.setStage(bot.procId, 1);
+                if (bot.dealId == '') bot.dealId  = await db.addDeal(bot);
+                //await db.addLog(`Deal started amount=${bot.amount}`)
             }
         }
         if (bot.stage == 1) { // try to place order to left sell
-            order = await placeOrder(bot.exchLeft, bot.pairLeft, 'limit', 'sell', bot.amount, bot.orderLeftSellPrice);
+            order = await placeOrder(bot.exchLeft, bot.pairLeft, 'limit', 'sell', bot.amount, bot.orderLeftSellPrice / 1.005);
             if (order.success) {
-                await       db.addLog(`${bot.strategy}:${bot.stage}: Sell order ${order.id} placed`);
-                bot         = await db.saveOrder(bot, 'orderLeftSell', order);
-                bot.stage   = await db.nextStage(bot.procId);
+                //await       db.addLog(`${bot.strategy}:${bot.stage}: Sell order ${order.id} placed`);
+                bot         = await db.newOrder(bot, 'orderLeftSell', order);
+                bot.stage   = await db.setStage(bot.procId, 2);
             } else          {console.log(order.error)}
         }
         if (bot.stage == 2) { // try to place order to right buy
             order = await placeOrder(bot.exchRigh, bot.pairRigh, 'limit', 'buy', bot.amount, bot.orderRighBuyPrice * 1.01);
             if (order.success) {
-                await       db.addLog(`${bot.strategy}:${bot.stage}: Buy order ${order.id} placed`);
-                bot         = await db.saveOrder(bot, 'orderRighBuy', order);
-                bot.stage   = await db.nextStage(bot.procId);
+                //await       db.addLog(`${bot.strategy}:${bot.stage}: Buy order ${order.id} placed`);
+                bot         = await db.newOrder(bot, 'orderRighBuy', order);
+                bot.stage   = await db.setStage(bot.procId, 3);
             } else          {console.log(order.error)}
         }
         if (bot.stage == 3) { // ?are orders closed  
@@ -259,7 +184,7 @@ async function doWBot(bot) {
                 }
             }
             if (bot.orderRighBuyClosed && bot.orderLeftSellClosed) {
-                bot.stage   = await db.nextStage(bot.procId); 
+                bot.stage   = await db.setStage(bot.procId, 4); 
             } else { console.log(`leftSell: ${bot.orderLeftSellClosed} || right Buy ${bot.orderRighBuyClosed}`)}
         }
         if (bot.stage == 4) { // looking for scope to sell from right and buy to left 
@@ -268,29 +193,85 @@ async function doWBot(bot) {
             bot.nextTime += setDelay(bot, scope, 'buy');
             console.log(`${bot.strategy} || ${func.nowTime()} || Scope: buy: ${scope.buy.toFixed(2)} || Scope: sell: ${scope.sell.toFixed(2)} || Time: ${scope.time}`);
             if (scope.buy > bot.disbalRigh) { // ready to sell  from right and buy to left
-                bot.stage               = await db.nextStage(bot.procId);
+                bot.stage               = await db.setStage(bot.procId, 11);
                 bot.orderLeftBuyPrice   = scope.askLeft;
                 bot.orderRighSellPrice  = scope.bidRigh;
             }
+            else if (scope.sell > bot.disbalRebal) {
+                bot.stage   = await db.setStage(bot.procId, 5);
+            }
         }
-        if (bot.stage == 5) { // try to place order to left buy
-            order = await placeOrder(bot.exchLeft, bot.pairLeft, 'limit', 'buy', bot.amount, bot.orderLeftBuyPrice);
+        if (bot.stage == 5) {
+            const balance = await bot.exchLeft.fetchBalance();
+            if (balance.USDT.free > bot.amountC) { 
+                const withdraw = await binance.withdraw ('USDT', bot.amountC+1, wav_usdt_dep_adr, { network: 'BSC' });
+                await db.addLog(`${bot.strategy} USDT withdraw started`);
+                bot.stage = await db.setStage(bot.procId, 6);
+            } else { bot.stage = await db.setStage(bot.procId, 4); }
+        }
+        if (bot.stage == 6) {
+            const balance = await bot.exchRigh.fetchBalance();
+            if (balance.WAVES.free > bot.amount) { 
+                const withdraw = await wavesdex.withdraw ('WAVES', bot.amount, bin_waves_dep_adr);
+                await db.addLog(`${bot.strategy} WAVES withdraw started`);
+                bot.stage = await db.setStage(bot.procId, 7);
+            } else { bot.stage = await db.setStage(bot.procId, 4); }
+        }
+        if (bot.stage == 7) {
+            const balance = await bot.exchRigh.fetchBalance();
+            console.log(balance.USDT); 
+            if (balance.USDT.free) 
+                if (balance.USDT.free > bot.amountC) {bot.stage = await db.setStage(bot.procId, 8);}
+                else { bot.nextTime += 10 * 1000; }
+            else { bot.nextTime += 10 * 1000; }
+        }
+        if (bot.stage == 8) {
+            order = await placeOrder(bot.exchRigh, 'USDT/USDN', 'limit', 'sell', bot.amountC, bot.rateRigh / 1.005);
+            if (order.success) {
+                await       db.addLog(`${bot.strategy}:${bot.stage}: USDT sell order ${order.id} placed`);
+                bot         = await db.newOrder(bot, 'orderUsdtUsdn', order);
+                bot.stage   = await db.setStage(bot.procId, 9);
+            } else          {console.log(order.error)}
+        }
+        if (bot.stage == 9) {
+            order = await getOrder(bot.exchRigh, bot.orderUsdtUsdn, 'USDT/USDN'); 
+            if (order.success && order.status == 'closed') {
+                bot         = await db.saveOrder(bot, 'orderUsdtUsdn', order);
+                console.log(`USDT Sell: ${bot.orderUsdtUsdnClosed} `);
+                bot.stage   = await db.setStage(bot.procId, 10);
+            } else { bot.nextTime += 5 * 1000; }
+        }
+        if (bot.stage == 10) {
+            let balance = await bot.exchRigh.fetchBalance();
+            if (balance.USDN.free > bot.amountC * bot.rateRigh) { 
+                balance = await bot.exchLeft.fetchBalance();
+                scope   = await getScopes(bot);
+                if (balance.WAVES.free >= bot.amount) {
+                    bot.stage = await db.setStage(bot.procId, 0);
+                    await db.addLog(`${bot.strategy}:rebalance completed`)
+                }
+                else { bot.nextTime += 10 * 1000; }
+            }
+            else { bot.nextTime += 10 * 1000; }
+        }
+        if (bot.stage == 11) { // try to place order to left buy
+            order = await placeOrder(bot.exchLeft, bot.pairLeft, 'limit', 'buy', bot.amount, bot.orderLeftBuyPrice * 1.005);
             //console.log(order);
             if (order.success) {
-                await       db.addLog(`${bot.strategy}:${bot.stage}: Buy order ${order.id} placed`);
-                bot         = await db.saveOrder(bot, 'orderLeftBuy', order);
-                bot.stage   = await db.nextStage(bot.procId);
+                //await       db.addLog(`${bot.strategy}:${bot.stage}: Buy order ${order.id} placed`);
+                bot         = await db.newOrder(bot, 'orderLeftBuy', order);
+                bot.stage   = await db.setStage(bot.procId, 12);
             } else                  {console.log(order.error)}
         }
-        if (bot.stage == 6) { // try to place order to right sell
+        if (bot.stage == 12) { // try to place order to right sell
             order = await placeOrder(bot.exchRigh, bot.pairRigh, 'limit', 'sell', bot.amount, bot.orderRighSellPrice / 1.01);
             if (order.success) {
-                await       db.addLog(`${bot.strategy}:${bot.stage}: Sell order ${order.id} placed`);
-                bot         = await db.saveOrder(bot, 'orderRighSell', order);
-                bot.stage   = await db.nextStage(bot.procId);
+                //await       db.addLog(`${bot.strategy}:${bot.stage}: Sell order ${order.id} placed`);
+                bot         = await db.newOrder(bot, 'orderRighSell', order);
+                bot.stage   = await db.setStage(bot.procId, 13);
             } else                  {console.log(order.error)}
         }
-        if (bot.stage == 7) { // ?are orders closed 
+        if (bot.stage == 13) { // ?are orders closed 
             if (!bot.orderRighSellClosed) {
                 order = await getOrder(bot.exchRigh, bot.orderRighSell, bot.pairRigh);
                 if (order.success && order.status == 'closed') {
@@ -304,31 +285,34 @@ async function doWBot(bot) {
                 }
             }
             if (bot.orderLeftBuyClosed && bot.orderRighSellClosed) {
-                    bot.stage   = await db.nextStage(bot.procId); 
+                    bot.stage   = await db.setStage(bot.procId, 14); 
             } else { console.log(`leftBuy: ${bot.orderLeftBuyClosed} || right sell ${bot.orderRighSellClosed}`)}
         }
-        if (bot.stage == 8) { // save results and restart
+        if (bot.stage == 14) { // save results and restart
             console.log('trying to save deal: ', bot.dealId);
-            bot.stage = await db.saveDeal(bot); 
+            bot.stage   = await db.saveDeal(bot); 
+            bot.dealId  = '';
         }
     }
     return bot;
 }
 
+
 async function botLoop() { 
     let bot         = {};
     let bots        = [];
-    
-    bot = await db.getProcData('62a03ea9527695861f98d6f7'); // get proc data ================= 
+
+    bot = await db.getProcData('62a1c48760f4df7c59575908'); // get proc data ================= 
     bot.exchLeft    = exchanges[bot.exchangeLeft];
     bot.exchRigh    = exchanges[bot.exchangeRigh];
     bot.nextTime    = Date.now();
-    bots[0]         = bot; 
-    bot = await db.getProcData('62a03eef9dbb07ddbd54bb85'); // get proc data ================= 
+    bots[0]         = bot;
+    bot = await db.getProcData('62a1c4b33f3b0a4095eeecb3'); // get proc data ================= 
     bot.exchLeft    = exchanges[bot.exchangeLeft];
     bot.exchRigh    = exchanges[bot.exchangeRigh];
     bot.nextTime    = Date.now();
-    bots[1]         = bot; 
+    bots[1]         = bot;
+
     console.log(`Having ${bots.length} bots..`);
     
 
@@ -337,7 +321,10 @@ async function botLoop() {
         if (rateTime < Date.now()) { usdtusdnRate = await setRate(); rateTime = Date.now() + 30*1000; }
 
         for (var i = 0; i < bots.length; i++ ) {
-            bots[i] = await doWBot(bots[i]);
+            if (bots[i].procType == 'rebalance1')        { bots[i] = await doRebalanceBot(bots[i]); }
+
+            
+
         }
         
 

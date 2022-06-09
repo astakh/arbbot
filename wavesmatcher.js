@@ -81,15 +81,15 @@ async function orderWavesStatus(orderCurr) {
     //console.log("orderStatus: ", orderCurr.id, res.status);
     return res;
 }
-async function placeWavesOrder(amountAssetId, priceAssetId, amount, price, orderType) {
+async function placeWAVESUSDNOrder(amount, price, orderType) {
     var orderParams = {
         // Фактическое количество amount-ассета нужно умножить на 10^amountAssetDecimals
         amount:             parseInt(amount * 10**8), // 1 WAVES
         // Цену, выраженную в price-ассете, нужно умножить на 10^(8 + priceAssetDecimals – amountAssetDecimals)
         version: 3,
         price:              parseInt(price * 10**6), 
-        amountAsset:        amountAssetId,
-        priceAsset:         priceAssetId,
+        amountAsset:        'WAVES',
+        priceAsset:         'DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p',
         matcherPublicKey:   matcherPublicKey,
         orderType:          orderType,
         matcherFee:         1,
@@ -115,6 +115,40 @@ async function placeWavesOrder(amountAssetId, priceAssetId, amount, price, order
     return res;
 }
  
+async function placeUSDTUSDNOrder(amount, price, orderType) {
+    var orderParams = {
+        // Фактическое количество amount-ассета нужно умножить на 10^amountAssetDecimals
+        amount:             parseInt(amount * 10**6), // 1 WAVES
+        // Цену, выраженную в price-ассете, нужно умножить на 10^(8 + priceAssetDecimals – amountAssetDecimals)
+        version: 3,
+        price:              parseInt(price * 10**8), 
+        amountAsset:        '34N9YcEETLWn93qYQ64EsP1x89tSruJU44RrEMSXXEPJ',
+        priceAsset:         'DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p',
+        matcherPublicKey:   matcherPublicKey,
+        orderType:          orderType,
+        matcherFee:         1,
+        matcherFeeAssetId:  matcherFeeAssetId, // WX
+        feeCalculated:      false,
+    }
+    let res = {};
+    orderParams = await getFee(orderParams);
+    if (orderParams.feeCalculated) {
+        let ord = await tryPlaceOrder(orderParams);
+        if (ord.success) { 
+            res.id      = ord.orderId; 
+            res.success = true;
+            res.order   = ord;
+        }
+        else { 
+            res.id = ''; 
+            res.error = ord.errorType;
+            //console.log(ord.errorType); 
+        }
+    }
+    else { res.id = ''; res.error = 'fee not calculated'; console.log('fee not calculated' , orderParams.error); }
+    return res;
+}
 
-module.exports.placeWavesOrder = placeWavesOrder;
+module.exports.placeWAVESUSDNOrder = placeWAVESUSDNOrder;
 module.exports.orderWavesStatus= orderWavesStatus;
+module.exports.placeUSDTUSDNOrder = placeUSDTUSDNOrder;
