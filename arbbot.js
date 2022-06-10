@@ -150,7 +150,18 @@ async function doRebalanceBot(bot) {
                 bot.orderLeftSellPrice  = scope.bidLeft;
                 bot.orderRighBuyPrice   = scope.askRigh;
                 bot.amount  = parseInt(bot.amountC / bot.orderLeftSellPrice) / 1;
-                if (bot.balLeftA >= bot.amount && bot.balRighC > bot.amount * bot.orderRighBuyPrice) {
+                let balanceOk = false;
+                if (bot.balLeftA >= bot.amount && bot.balRighC > bot.amount * bot.orderRighBuyPrice) { balanceOk = true; }
+                else {
+                    bot.amount = parseInt(bot.balLeftA);
+                    if (bot.balLeftA >= bot.amount && bot.balRighC > bot.amount * bot.orderRighBuyPrice) { balanceOk = true; }
+                    else {
+                        bot.amount = parseInt(bal.RighC / scope.sell) - 1;
+                        if ((bot.amount * scope.sell) > 200 && bot.balLeftA >= bot.amount && bot.balRighC > bot.amount * bot.orderRighBuyPrice) { balanceOk = true; }
+                    }
+                }
+
+                if (balanceOk) {
                     console.log(`${bot.strategy}:${bot.stage}: Balance OK`); 
                     bot.stage   = await db.setStage(bot.procId, 1);
                     if (bot.dealId == '') bot.dealId  = await db.addDeal(bot);
@@ -269,7 +280,7 @@ async function doRebalanceBot(bot) {
                     bot.stage = await db.setStage(bot.procId, 0);
                     await db.addLog(`${bot.strategy}:rebalance completed`)
                 }
-                else { { console.log(`${bot.strategy}:${bot.stage}: USDN amount too low`); bot.nextTime += 10 * 1000; }
+                else { console.log(`${bot.strategy}:${bot.stage}: USDN amount too low`); bot.nextTime += 10 * 1000; }
             }
             else { bot.nextTime += 10 * 1000; }
         }
