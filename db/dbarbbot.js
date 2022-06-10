@@ -97,7 +97,8 @@ mongoose
 
     const testSchema = new Schema ({
         text:       { type: String, },
-        currency:   { type: Object, } 
+        currency:   { type: Object, },
+        curs:       { type: Array, }
     }, {timestamps: true});
     const Test = mongoose.model('Test', testSchema); 
         
@@ -286,7 +287,7 @@ async function addMask1() {
 }
 
 async function addTest(data) {
-    let test = new Log(data);
+    let test = new Test(data);
     console.log(test)
     await test.save();
 }

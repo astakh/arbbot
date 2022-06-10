@@ -231,12 +231,18 @@ async function doRebalanceBot(bot) {
             } else { bot.stage = await db.setStage(bot.procId, 4); }
         }
         if (bot.stage == 7) {
-            const balance = await bot.exchRigh.fetchBalance();
-            console.log(balance.USDT); 
-            if (balance.USDT.free) 
-                if (balance.USDT.free > bot.amountC) {bot.stage = await db.setStage(bot.procId, 8);}
+            try {
+                const balance = await bot.exchRigh.fetchBalance();
+                console.log(balance.USDT); 
+                if (balance.USDT.free) 
+                    if (balance.USDT.free > bot.amountC) {bot.stage = await db.setStage(bot.procId, 8);}
+                    else { bot.nextTime += 10 * 1000; }
                 else { bot.nextTime += 10 * 1000; }
-            else { bot.nextTime += 10 * 1000; }
+            }
+            catch(err) {
+                console.log(err);
+                bot.nextTime += 10 * 1000;
+            }
         }
         if (bot.stage == 8) {
             order = await placeOrder(bot.exchRigh, 'USDT/USDN', 'limit', 'sell', bot.amountC, bot.rateRigh / 1.005);
