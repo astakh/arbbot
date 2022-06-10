@@ -111,7 +111,7 @@ async function placeWAVESUSDNOrder(amount, price, orderType) {
             //console.log(ord.errorType); 
         }
     }
-    else { res.id = ''; res.error = 'fee not calculated'; console.log('fee not calculated' , orderParams.error); }
+    else { res.id = ''; res.success = false; res.error = 'fee not calculated'; console.log('fee not calculated' , orderParams.error); }
     return res;
 }
  
@@ -145,7 +145,7 @@ async function placeUSDTUSDNOrder(amount, price, orderType) {
             //console.log(ord.errorType); 
         }
     }
-    else { res.id = ''; res.error = 'fee not calculated'; console.log('fee not calculated' , orderParams.error); }
+    else { res.id = ''; res.success = false; res.error = 'fee not calculated'; console.log('fee not calculated' , orderParams.error); }
     return res;
 }
 

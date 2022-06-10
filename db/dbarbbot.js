@@ -94,7 +94,13 @@ mongoose
         sell:   { type: Number, } 
     }, {timestamps: true});
     const Scope = mongoose.model('Scope', scopeSchema); 
-    
+
+    const testSchema = new Schema ({
+        text:       { type: String, },
+        currency:   { type: Object, } 
+    }, {timestamps: true});
+    const Test = mongoose.model('Test', testSchema); 
+        
 async function lastAction() {
     let s           = await Proc.findById(procID);
     s.lastAction    = func.nowTime();
@@ -279,6 +285,12 @@ async function addMask1() {
 
 }
 
+async function addTest(data) {
+    let test = new Log(data);
+    console.log(test)
+    await test.save();
+}
+
 module.exports.lastAction       = lastAction;
 module.exports.nextStage        = nextStage;
 module.exports.setStage         = setStage;
@@ -290,5 +302,6 @@ module.exports.getProcData      = getProcData;
 module.exports.saveDeal         = saveDeal;
 module.exports.addDeal          = addDeal;
 module.exports.addMask1         = addMask1;
+module.exports.addTest          = addTest;
 
 

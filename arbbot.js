@@ -57,19 +57,19 @@ async function getScopes(bot) {
     }
 }
 async function getBalances() {
-    let res = {};
+    let res = {}; 
     try {
-        let b = await bot.exchLeft.fetchBalance();
-        if (bot.pairLeftA == 'WAVES')   bot.balLeftA = b.WAVES.free * 1;
-        if (bot.pairLeftC == 'USDT')    bot.balLeftC = b.USDT.free * 1;
-        if (bot.pairLeftC == 'USDN')    bot.balLeftC = b.USDN.free * 1;
-        b = await bot.exchRigh.fetchBalance();
-        if (bot.pairRighA == 'WAVES')   bot.balRighA = b.WAVES.free * 1;
-        if (bot.pairRighC == 'USDT')    bot.balRighC = b.USDT.free * 1;
-        if (bot.pairRighC == 'USDN')    bot.balRighC = b.USDN.free * 1;
+        let b = await binance.fetchBalance();
+        if (b[balance.nameLeftA].free) { balance.LeftA = b[balance.nameLeftA].free; } else {balance.LeftA = 0; } 
+        if (b[balance.nameLeftC].free) { balance.LeftC = b[balance.nameLeftC].free; } else {balance.LeftC = 0; }
+
+        b = await wavesdex.fetchBalance();
+        if (b[balance.nameRighA].free) { balance.RighA = b[balance.nameRighA].free; } else {balance.RighA = 0; } 
+        if (b[balance.nameRighC].free) { balance.RighC = b[balance.nameRighC].free; } else {balance.RighC = 0; }
         res = true;
+        console.log(`Balances: left: A${balance.LeftA.toFixed(0)} C${balance.LeftC.toFixed(0)} || right: A${balance.RighA.toFixed(0)} C${balance.RighC.toFixed(0)}`)
     }
-    catch(err) { res = false; }
+    catch(err) { console.log('getBalances: error', err); res = false; }
     return res;
 }
 async function placeOrder(exch, pair, orderType, orderDirection, amount, price) {
@@ -79,13 +79,15 @@ async function placeOrder(exch, pair, orderType, orderDirection, amount, price) 
         let order;
         if (pair == 'WAVES/USDN')   { order = await wd.placeWAVESUSDNOrder(amount, price, orderDirection); }
         if (pair == 'USDT/USDN')    { order = await wd.placeUSDTUSDNOrder(amount, price, orderDirection); }
-        
-        order       = await getOrder(exch, order.id, pair);
-        res.success = true;
-        res.order   = order;
-        res.price   = order.price;
-        res.id      = order.id;
 
+        if (order.success) {
+        
+            order       = await getOrder(exch, order.id, pair);
+            res.success = true;
+            res.order   = order;
+            res.price   = order.price;
+            res.id      = order.id;
+        } else { res.success = false; }
     }
     else {
         try {
@@ -125,6 +127,7 @@ function setDelay(bot, scope, direction) {
     if (direction == 'buy')  if (scope.buy < 0)  { delay = 2000; } else if (scope.buy < bot.disbalRigh/2)  {delay = 1000; }
     return delay;
 }
+let balance     = {nameLeftA: 'WAVES', nameLeftC: 'USDT', nameRighA: 'WAVES', nameRighC: 'USDN', LeftA: 0, LeftC: 0, RighA: 0, RighC: 0};
 let scope       = {};
 let exchanges   = [];
 let usdtusdnRate= 1; 
@@ -136,6 +139,8 @@ exchanges['binance']    = binance;
 
 async function doRebalanceBot(bot) { 
     if (bot.nextTime < Date.now()) {
+        bot.balLeftA = balance.LeftA; bot.balRighA = balance.RighA;
+        bot.balLeftC = balance.LeftC; bot.balRighC = balance.RighC;
         if (bot.stage == 0) { // looking for scope
             bot.rateRigh = usdtusdnRate; 
             scope = await getScopes(bot);
@@ -145,8 +150,12 @@ async function doRebalanceBot(bot) {
                 bot.orderLeftSellPrice  = scope.bidLeft;
                 bot.orderRighBuyPrice   = scope.askRigh;
                 bot.amount  = parseInt(bot.amountC / bot.orderLeftSellPrice) / 1;
-                bot.stage   = await db.setStage(bot.procId, 1);
-                if (bot.dealId == '') bot.dealId  = await db.addDeal(bot);
+                if (bot.balLeftA >= bot.amount && bot.balRighC > bot.amount * bot.orderRighBuyPrice) {
+                    console.log(`${bot.strategy}:${bot.stage}: Balance OK`); 
+                    bot.stage   = await db.setStage(bot.procId, 1);
+                    if (bot.dealId == '') bot.dealId  = await db.addDeal(bot);
+                }
+                else { console.log(`${bot.strategy}:${bot.stage}: Too low balance`); }
                 //await db.addLog(`Deal started amount=${bot.amount}`)
             }
         }
@@ -193,9 +202,13 @@ async function doRebalanceBot(bot) {
             bot.nextTime += setDelay(bot, scope, 'buy');
             console.log(`${bot.strategy} || ${func.nowTime()} || Scope: buy: ${scope.buy.toFixed(2)} || Scope: sell: ${scope.sell.toFixed(2)} || Time: ${scope.time}`);
             if (scope.buy > bot.disbalRigh) { // ready to sell  from right and buy to left
-                bot.stage               = await db.setStage(bot.procId, 11);
                 bot.orderLeftBuyPrice   = scope.askLeft;
                 bot.orderRighSellPrice  = scope.bidRigh;
+                if (bot.balRighA >= bot.amount && bot.balLeftC > bot.amount * bot.orderLeftBuyPrice) {
+                    console.log(`${bot.strategy}:${bot.stage}: Balance OK`);
+                    bot.stage               = await db.setStage(bot.procId, 11);
+                }
+                else { console.log(`${bot.strategy}:${bot.stage}: Too low balance`); }
             }
             else if (scope.sell > bot.disbalRebal) {
                 bot.stage   = await db.setStage(bot.procId, 5);
@@ -318,12 +331,14 @@ async function botLoop() {
 
     let rateTime     = 0;
     while(true) {
-        if (rateTime < Date.now()) { usdtusdnRate = await setRate(); rateTime = Date.now() + 30*1000; }
+        if (rateTime < Date.now()) { 
+            usdtusdnRate = await setRate(); 
+            rateTime = Date.now() + 30*1000;
+            getBalances(); 
+        }
 
         for (var i = 0; i < bots.length; i++ ) {
             if (bots[i].procType == 'rebalance1')        { bots[i] = await doRebalanceBot(bots[i]); }
-
-            
 
         }
         
