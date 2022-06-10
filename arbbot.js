@@ -258,7 +258,7 @@ async function doRebalanceBot(bot) {
                 bot         = await db.saveOrder(bot, 'orderUsdtUsdn', order);
                 console.log(`USDT Sell: ${bot.orderUsdtUsdnClosed} `);
                 bot.stage   = await db.setStage(bot.procId, 10);
-            } else { bot.nextTime += 5 * 1000; }
+            } else { console.log(`${bot.strategy}:${bot.stage}: order is not closed`); bot.nextTime += 5 * 1000; }
         }
         if (bot.stage == 10) {
             let balance = await bot.exchRigh.fetchBalance();
@@ -269,7 +269,7 @@ async function doRebalanceBot(bot) {
                     bot.stage = await db.setStage(bot.procId, 0);
                     await db.addLog(`${bot.strategy}:rebalance completed`)
                 }
-                else { bot.nextTime += 10 * 1000; }
+                else { { console.log(`${bot.strategy}:${bot.stage}: USDN amount too low`); bot.nextTime += 10 * 1000; }
             }
             else { bot.nextTime += 10 * 1000; }
         }
