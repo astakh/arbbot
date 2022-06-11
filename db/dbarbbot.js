@@ -139,13 +139,17 @@ async function saveOrder(bot, orderType, order) {
         bot[orderType + 'Price']    = order.average;
         bot[orderType + 'Closed']   = true;
         let fee = 0; let k = 1;
-        if (orderType.indexOf('orderUsdtUsdn') == -1) {
+        /*if (orderType.indexOf('orderUsdtUsdn') == -1) {
             if (orderType.indexOf('Left') > -1) { fee = 0.00075; }
             else                                { fee = 0.0005;  k = bot.rateRigh}
             console.log(proc.profit, order.average, proc.amount, fee)
             if (orderType.indexOf('Sell') > -1) { proc.profit += proc.amount * order.average * (1 - fee) / k; }
             else                                { proc.profit -= proc.amount * order.average * (1 + fee) / k; }
-        }
+        }*/
+        if (orderType == 'orderLeftSell') proc.profit += proc.amount * order.average * (1 - 0.00075);
+        if (orderType == 'orderRighBuy')  proc.profit -= proc.amount * order.average * (1 + 0.0005) / bot.rateRigh;
+        if (orderType == 'orderLeftBuy')  proc.profit -= proc.amount * order.average * (1 + 0.00075);
+        if (orderType == 'orderRighSell') proc.profit += proc.amount * order.average * (1 - 0.0005) / bot.rateRigh;
         
         await addLog(`${proc.strategy}:${orderType} with price ${order.average.toFixed(2)} closed`);
         await proc.save();
@@ -187,7 +191,8 @@ async function addDeal(bot) {
     await       addLog(`${bot.strategy} Deal started with amount ${bot.amount}`)
     return      d._id;
 }
-async function saveDeal(proc){ 
+async function saveDeal(bot){
+    let proc = await Proc.findById(bot.procId); 
     try {
         let d = await Deal.findById(proc.dealId);
         d.amount                = proc.amount;
@@ -213,6 +218,8 @@ async function saveDeal(proc){
             d.orderLeftSell         = '';
             d.orderRighSell         = '';
             d.orderRighBuy          = '';
+            d.orderUsdtUsdn         = '';
+            d.orderUsdtUsdnClosed   = false;
             d.orderLeftBuyClosed    = false;
             d.orderLeftSellClosed   = false;
             d.orderRighSellClosed   = false;

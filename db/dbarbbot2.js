@@ -19,11 +19,11 @@ const maskSchema = new Schema ({
     exch2:              { type: Object, },
     name:               { type: String, },
     procType:           { type: String, },
+    move:               { type: Object, },
     cion:               { type: Object, },
     base:               { type: Object, },
     disbal:             { type: Object, },
-    amountC:            { type: Number, },
-    amountB:            { type: Number, },
+    amount:             { type: Object, },
     orderSel:           { type: Object, }, // tow orders: sell from left and buy to right
     orderBuy:           { type: Object, },
     
@@ -58,18 +58,54 @@ async function addLog(t) {
     await func.sendAlert(t);
     console.log(t)
     await log.save();
+} 
+async function addDeal(bot) {
+    let proc = await Proc.findById(bot.procId); 
+    proc.move = bot.move;
+    let deal = new Deal({
+        procId: proc.procId, maskId: proc.maskId,
+        profit: proc.profit
+    });
+    proc.dealId = deal._id; 
+    bot.dealId = deal._id; 
+    proc.stage  = 1; 
+    bot.stage  = 1; 
+     
+    await deal.save();
+    await proc.save(); 
+
+    return bot;
 }
-async function addScope(s, b) {
-    let log = new Scope({buy: b, sell: s}); 
-    await log.save();
+async function getProc(procId){
+    try {
+        let proc = await Proc.findById(procId);
+        if (proc) { return proc; }
+    }
+    catch(err) { console.log(err); return false; }
 }
-async function getProcData(procId){
-    let p = await Proc.findById(procId);
-    return p;
+async function setStage(bot, nextStage) {
+    let proc    = await Proc.findById(bot.procId);
+    proc.stage  = nextStage;
+    proc.move   = bot.move;
+    await proc.save();
+    await addLog(`${proc.name} stage ${proc.stage}`)
+    return nextStage;
 }
 
 
 async function addMask() {
+    const move = {
+        sel: {
+            amount: 0,
+            left:   {base: 0, price: 0, direction: 'sell', orderId: '', status: ''},
+            right:  {base: 0, price: 0, direction: 'buy', orderId: '', status: ''}
+        },
+        buy: {
+            amount: 0,
+            left:   {base: 0, price: 0, direction: 'sell', orderId: '', status: ''},
+            right:  {base: 0, price: 0, direction: 'buy', orderId: '', status: ''}
+        }
+    }
     const coin = {
         name: 'WAVES',
         ticker: {left: 'WAVES', right: 'WAVES', rate: 1, ccxt: 'WAVES'}, // rate = 
@@ -77,12 +113,12 @@ async function addMask() {
     }
     const base1 = {
         name: 'USDT',
-        ticker: {left: 'USDT', right: 'USDT', rate: 1, ccxt: 'USDT'}, //  
+        ticker: {left: 'USDT', right: '34N9YcEETLWn93qYQ64EsP1x89tSruJU44RrEMSXXEPJ', rate: 1, ccxt: 'USDT'}, //  
         balance:0,
     }
     const base2 = {
         name: 'USDN',
-        ticker: {left: 'USDN', right: '=-=-=-=-=-=', rate: 1, ccxt: 'USDN'}, //  
+        ticker: {left: 'USDN', right: 'DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p', rate: 1, ccxt: 'USDN'}, //  
         balance:0,
     }
     const exch1 = {
@@ -96,8 +132,8 @@ async function addMask() {
     const moves = []
     const profit = {result: 0, moves: moves}
     const disbal = {
-        deal: {s: 0.4, b:  0.4},
-        rebal:{to1: 0.7, to1: 0.7}  
+        deal: {sel: 0.4, buy:  0.4},
+        rebal:{to1: 0.7, to2: 0.7}  
     }
     const orderSel = {
         left: {
@@ -139,20 +175,21 @@ async function addMask() {
             filled:     0,
         }
     }
+    const amount    = { coin: 0, base: 30}
     const params = {
     enabled:            true,
     stage:              0,
+    move:               move, 
     profit:             profit,
     exch1:              exch1,
     exch2:              exch2,
-    name:               'vertion2',
-    procType:           'vertion2',
+    name:               'V2',
+    procType:           'version2',
     coin:               coin,
     base1:              base1,
     base2:              base2,
     disbal:             disbal,
-    amountC:            0,
-    amountB:            200,
+    amount:             amount,
     orderSel:           orderSel, 
     orderBuy:           orderBuy,
     
@@ -176,7 +213,8 @@ async function addMask() {
 
 
 module.exports.addLog           = addLog;
-module.exports.addScope         = addScope;
-module.exports.getProcData      = getProcData;
+module.exports.addDeal          = addDeal; 
+module.exports.getProc          = getProc;
 module.exports.addMask          = addMask;
+module.exports.setStage         = setStage;
 

@@ -83,20 +83,24 @@ async function placeOrder(exch, pair, orderType, orderDirection, amount, price) 
         if (order.success) {
         
             order       = await getOrder(exch, order.id, pair);
-            res.success = true;
-            res.order   = order;
-            res.price   = order.price;
-            res.id      = order.id;
-        } else { res.success = false; }
+            if (order.success){
+                res.success = true;
+                res.order   = order;
+                res.price   = order.price;
+                res.id      = order.id;
+            } else { res.success = false; res.error=err; }
+        } else { res.success = false; res.error=err; }
     }
     else {
         try {
             let order   = await exch.createOrder(pair, orderType, orderDirection, amount, price);
             order       = await getOrder(exch, order.id, pair);
-            res.success = true;
-            res.order   = order;
-            res.price   = order.price;
-            res.id      = order.id;
+            if (order.success){
+                res.success = true;
+                res.order   = order;
+                res.price   = order.price;
+                res.id      = order.id;
+            } else { res.success = false; res.error=err; }
         }
         catch(err) { res.success=false;  res.error=err; }
     }
@@ -113,7 +117,7 @@ async function getOrder(exch, id, pair) {
         res.average = order.average;
         res.status  = order.status;
     }
-    catch(err) { res.success=false;  res.error=err; }
+    catch(err) { res.success=false;  res.error = err; }
     return res;
 }
 async function setRate() {
@@ -149,7 +153,11 @@ async function doRebalanceBot(bot) {
             if (scope.sell > bot.disbalLeft) { // ready to sell from left and buy to right
                 bot.orderLeftSellPrice  = scope.bidLeft;
                 bot.orderRighBuyPrice   = scope.askRigh;
-                bot.amount  = parseInt(bot.amountC / bot.orderLeftSellPrice) / 1;
+                bot.amount  = Math.min(
+                    parseInt(bot.amountC / bot.orderLeftSellPrice) - 1,
+                    bot.balLeftA,
+                    parseInt(bot.balRighC / bot.orderRighBuyPrice) - 1
+                );
                 let balanceOk = false;
                 if (bot.balLeftA >= bot.amount && bot.balRighC > bot.amount * bot.orderRighBuyPrice) { balanceOk = true; }
                 else {
@@ -176,7 +184,7 @@ async function doRebalanceBot(bot) {
                 //await       db.addLog(`${bot.strategy}:${bot.stage}: Sell order ${order.id} placed`);
                 bot         = await db.newOrder(bot, 'orderLeftSell', order);
                 bot.stage   = await db.setStage(bot.procId, 2);
-            } else          {console.log(order.error)}
+            } else          {console.log('order price', bot.orderLeftSellPrice, order.error)}
         }
         if (bot.stage == 2) { // try to place order to right buy
             order = await placeOrder(bot.exchRigh, bot.pairRigh, 'limit', 'buy', bot.amount, bot.orderRighBuyPrice * 1.01);
@@ -219,7 +227,7 @@ async function doRebalanceBot(bot) {
                     console.log(`${bot.strategy}:${bot.stage}: Balance OK`);
                     bot.stage               = await db.setStage(bot.procId, 11);
                 }
-                else { console.log(`${bot.strategy}:${bot.stage}: Too low balance`); }
+                else { console.log(`${bot.strategy}:${bot.stage}: Too low balance`, bot.balRighA, bot.balLeftC); }
             }
             else if (scope.sell > bot.disbalRebal) {
                 bot.stage   = await db.setStage(bot.procId, 5);
