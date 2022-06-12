@@ -344,12 +344,12 @@ async function botLoop() {
     bot.exchLeft    = exchanges[bot.exchangeLeft];
     bot.exchRigh    = exchanges[bot.exchangeRigh];
     bot.nextTime    = Date.now();
-    bots[0]         = bot;
+    bots[0]         = bot;/*
     bot = await db.getProcData('62a1c4b33f3b0a4095eeecb3'); // get proc data ================= 
     bot.exchLeft    = exchanges[bot.exchangeLeft];
     bot.exchRigh    = exchanges[bot.exchangeRigh];
     bot.nextTime    = Date.now();
-    bots[1]         = bot;
+    bots[1]         = bot;*/
 
     console.log(`Having ${bots.length} bots..`);
     
