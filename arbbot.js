@@ -223,6 +223,11 @@ async function doRebalanceBot(bot) {
             if (scope.buy > bot.disbalRigh) { // ready to sell  from right and buy to left
                 bot.orderLeftBuyPrice   = scope.askLeft;
                 bot.orderRighSellPrice  = scope.bidRigh;
+                bot.amount  = Math.min(
+                    parseInt(bot.amountC / bot.orderLeftSellPrice) - 1,
+                    bot.balLeftA,
+                    parseInt(bot.balRighC / bot.orderRighBuyPrice) - 1
+                );
                 if (bot.balRighA >= bot.amount && bot.balLeftC > bot.amount * bot.orderLeftBuyPrice) {
                     console.log(`${bot.strategy}:${bot.stage}: Balance OK`);
                     bot.stage               = await db.setStage(bot.procId, 11);
