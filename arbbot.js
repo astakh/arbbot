@@ -239,7 +239,12 @@ async function doRebalanceBot(bot) {
             }
         }
         if (bot.stage == 5) {
-            const balance = await bot.exchLeft.fetchBalance();
+            bot.amount  = parseInt(Math.min(
+                parseInt(bot.amountC / bot.orderRighSellPrice) - 1,
+                bot.balRighA,
+                parseInt(bot.balLeftC / bot.orderLeftBuyPrice) - 1
+            ));
+        const balance = await bot.exchLeft.fetchBalance();
             if (balance.USDT.free > bot.amountC) { 
                 const withdraw = await binance.withdraw ('USDT', bot.amountC+1, wav_usdt_dep_adr, { network: 'BSC' });
                 await db.addLog(`${bot.strategy} USDT withdraw started`);
