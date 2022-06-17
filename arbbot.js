@@ -134,7 +134,7 @@ function setDelay(bot, scope, direction) {
 let balance     = {nameLeftA: 'WAVES', nameLeftC: 'USDT', nameRighA: 'WAVES', nameRighC: 'USDN', LeftA: 0, LeftC: 0, RighA: 0, RighC: 0};
 let scope       = {};
 let exchanges   = [];
-let usdtusdnRate= 1; 
+let usdtusdnRate= 0; 
 let order;
 
 exchanges['wavesdex']   = wavesdex;
@@ -179,12 +179,16 @@ async function doRebalanceBot(bot) {
             }
         }
         if (bot.stage == 1) { // try to place order to left sell
-            order = await placeOrder(bot.exchLeft, bot.pairLeft, 'limit', 'sell', bot.amount, bot.orderLeftSellPrice / 1.005);
+            console.log(bot.orderLeftSellPrice / 1.005)
+            order = await placeOrder(bot.exchLeft, bot.pairLeft, 'limit', 'sell', bot.amount, parseFloat(bot.orderLeftSellPrice / 1.005));
             if (order.success) {
                 //await       db.addLog(`${bot.strategy}:${bot.stage}: Sell order ${order.id} placed`);
                 bot         = await db.newOrder(bot, 'orderLeftSell', order);
                 bot.stage   = await db.setStage(bot.procId, 2);
-            } else          {console.log('order price', bot.orderLeftSellPrice, order.error)}
+            } else          { 
+                bot.stage   = await db.setStage(bot.procId, 0);
+                console.log('order price', bot.orderLeftSellPrice, order.error)
+            }
         }
         if (bot.stage == 2) { // try to place order to right buy
             order = await placeOrder(bot.exchRigh, bot.pairRigh, 'limit', 'buy', bot.amount, bot.orderRighBuyPrice * 1.01);
@@ -239,22 +243,24 @@ async function doRebalanceBot(bot) {
             }
         }
         if (bot.stage == 5) {
-            bot.amount  = parseInt(Math.min(
-                parseInt(bot.amountC / bot.orderRighSellPrice) - 1,
-                bot.balRighA,
-                parseInt(bot.balLeftC / bot.orderLeftBuyPrice) - 1
-            ));
+            bot.rebalAmountC  = parseInt(Math.min(
+                bot.balLeftC - 1,
+                bot.balRighA * bot.orderLeftBuyPrice 
+            ))
+            console.log(`rebal amountC:${bot.rebalAmountC}`)
         const balance = await bot.exchLeft.fetchBalance();
-            if (balance.USDT.free > bot.amountC) { 
-                const withdraw = await binance.withdraw ('USDT', bot.amountC+1, wav_usdt_dep_adr, { network: 'BSC' });
+            if ((balance.USDT.free > bot.rebalAmountC) && (bot.rebalAmountC > 100)) { 
+                const withdraw = await binance.withdraw ('USDT', bot.rebalAmountC+1, wav_usdt_dep_adr, { network: 'BSC' });
                 await db.addLog(`${bot.strategy} USDT withdraw started`);
                 bot.stage = await db.setStage(bot.procId, 6);
             } else { bot.stage = await db.setStage(bot.procId, 4); }
         }
         if (bot.stage == 6) {
+            bot.rebalAmountA = bot.rebalAmountC / bot.orderLeftBuyPrice
+            console.log(`rebal amountA:${bot.rebalAmountA}`)
             const balance = await bot.exchRigh.fetchBalance();
-            if (balance.WAVES.free > bot.amount) { 
-                const withdraw = await wavesdex.withdraw ('WAVES', bot.amount, bin_waves_dep_adr);
+            if (balance.WAVES.free > bot.rebalAmountA) { 
+                const withdraw = await wavesdex.withdraw ('WAVES', bot.rebalAmountA, bin_waves_dep_adr);
                 await db.addLog(`${bot.strategy} WAVES withdraw started`);
                 bot.stage = await db.setStage(bot.procId, 7);
             } else { bot.stage = await db.setStage(bot.procId, 4); }
@@ -369,14 +375,14 @@ async function botLoop() {
         if (rateTime < Date.now()) { 
             usdtusdnRate = await setRate(); 
             rateTime = Date.now() + 30*1000;
-            getBalances(); 
+            await getBalances(); 
         }
+        if (usdtusdnRate > 0 ) {
+            for (var i = 0; i < bots.length; i++ ) {
+                if (bots[i].procType == 'rebalance1')        { bots[i] = await doRebalanceBot(bots[i]); }
 
-        for (var i = 0; i < bots.length; i++ ) {
-            if (bots[i].procType == 'rebalance1')        { bots[i] = await doRebalanceBot(bots[i]); }
-
+            }
         }
-        
 
         //round++;
         //await func.sleep(delay);
