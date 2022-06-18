@@ -154,9 +154,9 @@ async function doRebalanceBot(bot) {
                 bot.orderLeftSellPrice  = scope.bidLeft;
                 bot.orderRighBuyPrice   = scope.askRigh;
                 bot.amount  = Math.min(
-                    parseInt(bot.amountC / bot.orderLeftSellPrice) - 1,
+                    parseInt(bot.amountC / bot.orderLeftSellPrice / 1.005) - 1,
                     bot.balLeftA,
-                    parseInt(bot.balRighC / bot.orderRighBuyPrice) - 1
+                    parseInt(bot.balRighC / bot.orderRighBuyPrice / 1.005) - 1
                 );
                 let balanceOk = false;
                 if (bot.balLeftA >= bot.amount && bot.balRighC > bot.amount * bot.orderRighBuyPrice) { balanceOk = true; }
