@@ -139,13 +139,7 @@ async function saveOrder(bot, orderType, order) {
         bot[orderType + 'Price']    = order.average;
         bot[orderType + 'Closed']   = true;
         let fee = 0; let k = 1;
-        /*if (orderType.indexOf('orderUsdtUsdn') == -1) {
-            if (orderType.indexOf('Left') > -1) { fee = 0.00075; }
-            else                                { fee = 0.0005;  k = bot.rateRigh}
-            console.log(proc.profit, order.average, proc.amount, fee)
-            if (orderType.indexOf('Sell') > -1) { proc.profit += proc.amount * order.average * (1 - fee) / k; }
-            else                                { proc.profit -= proc.amount * order.average * (1 + fee) / k; }
-        }*/
+
         if (orderType == 'orderLeftSell') {
             proc.profit += order.amount * order.average
             proc.profit -= order.amount * order.average * 0.00075
