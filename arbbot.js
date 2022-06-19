@@ -114,6 +114,7 @@ async function getOrder(exch, id, pair) {
         res.order   = order;
         res.id      = order.id;
         res.price   = order.price;
+        res.amount  = order.amount;
         res.average = order.average;
         res.status  = order.status;
     }

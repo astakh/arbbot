@@ -146,10 +146,22 @@ async function saveOrder(bot, orderType, order) {
             if (orderType.indexOf('Sell') > -1) { proc.profit += proc.amount * order.average * (1 - fee) / k; }
             else                                { proc.profit -= proc.amount * order.average * (1 + fee) / k; }
         }*/
-        if (orderType == 'orderLeftSell') proc.profit += proc.amount * order.average * (1 - 0.00075);
-        if (orderType == 'orderRighBuy')  proc.profit -= proc.amount * order.average * (1 + 0.0005) / bot.rateRigh;
-        if (orderType == 'orderLeftBuy')  proc.profit -= proc.amount * order.average * (1 + 0.00075);
-        if (orderType == 'orderRighSell') proc.profit += proc.amount * order.average * (1 - 0.0005) / bot.rateRigh;
+        if (orderType == 'orderLeftSell') {
+            proc.profit += order.amount * order.average
+            proc.profit -= order.amount * order.average * 0.00075
+        }
+        if (orderType == 'orderRighBuy')  {
+            proc.profit -= order.amount * order.average / bot.rateRigh
+            proc.profit -= order.amount * order.average / bot.rateRigh * 0.0005
+        }
+        if (orderType == 'orderLeftBuy')  {
+            proc.profit -= order.amount * order.average
+            proc.profit -= order.amount * order.average * 0.00075
+        }
+        if (orderType == 'orderRighSell') {
+            proc.profit += order.amount * order.average / bot.rateRigh
+            proc.profit -= order.amount * order.average / bot.rateRigh * 0.0005
+        }
         
         await addLog(`${proc.strategy}:${orderType} with price ${order.average.toFixed(2)} closed`);
         await proc.save();
