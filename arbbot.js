@@ -366,6 +366,8 @@ async function botLoop() {
     bot = await db.getProcData('62a1c48760f4df7c59575908'); // get proc data ================= 
     bot.exchLeft    = exchanges[bot.exchangeLeft];
     bot.exchRigh    = exchanges[bot.exchangeRigh];
+    bot.bestBuy     = 0
+    bot.bestSell    = 0
     bot.nextTime    = Date.now();
     bots[0]         = bot;/*
     bot = await db.getProcData('62a1c4b33f3b0a4095eeecb3'); // get proc data ================= 
