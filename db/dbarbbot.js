@@ -298,6 +298,10 @@ async function addMask1() {
     console.log(m._id, 'mask created');
 
 }
+async function getScopes() {
+    const scopes = Scope.find()
+    return scopes
+}
 
 async function addTest(data) {
     let test = new Test(data);
@@ -317,5 +321,6 @@ module.exports.saveDeal         = saveDeal;
 module.exports.addDeal          = addDeal;
 module.exports.addMask1         = addMask1;
 module.exports.addTest          = addTest;
+module.exports.getScopes        = getScopes;
 
 

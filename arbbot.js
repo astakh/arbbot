@@ -275,7 +275,7 @@ async function doRebalanceBot(bot) {
                 const balance = await bot.exchRigh.fetchBalance();
                 console.log(balance.USDT); 
                 if (balance.USDT.free) 
-                    if (balance.USDT.free > bot.amountC) {bot.stage = await db.setStage(bot.procId, 8);}
+                    if (balance.USDT.free > bot.rebalAmountC) {bot.stage = await db.setStage(bot.procId, 8);}
                     else { bot.nextTime += 10 * 1000; }
                 else { bot.nextTime += 10 * 1000; }
             }
@@ -285,7 +285,7 @@ async function doRebalanceBot(bot) {
             }
         }
         if (bot.stage == 8) {
-            order = await placeOrder(bot.exchRigh, 'USDT/USDN', 'limit', 'sell', bot.amountC, bot.rateRigh / 1.005);
+            order = await placeOrder(bot.exchRigh, 'USDT/USDN', 'limit', 'sell', bot.rebalAmountC, bot.rateRigh / 1.005);
             if (order.success) {
                 await       db.addLog(`${bot.strategy}:${bot.stage}: USDT sell order ${order.id} placed`);
                 bot         = await db.newOrder(bot, 'orderUsdtUsdn', order);
