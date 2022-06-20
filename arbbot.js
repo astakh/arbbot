@@ -35,6 +35,8 @@ async function getScopes(bot) {
     if (l.askPrice>0 && r.askPrice>0) {
         res.buy     = (r.bidPrice/bot.rateRigh - l.askPrice/bot.rateLeft) / l.askPrice/bot.rateLeft * 100;
         res.sell    = (l.bidPrice/bot.rateLeft - r.askPrice/bot.rateRigh) / r.askPrice/bot.rateRigh * 100;
+        if (res.buy > bot.bestBuy) {res.bestBuy = res.buy} else {res.bestBuy = bot.bestBuy}
+        if (res.sell> bot.bestSell){res.bestSell= res.sell}else {res.bestSell= bot.bestSell}
         res.bidLeft = l.bidPrice;
         res.askLeft = l.askPrice;
         res.bidRigh = r.bidPrice;
@@ -146,11 +148,13 @@ async function doRebalanceBot(bot) {
     if (bot.nextTime < Date.now()) {
         bot.balLeftA = balance.LeftA; bot.balRighA = balance.RighA;
         bot.balLeftC = balance.LeftC; bot.balRighC = balance.RighC;
-        scope = await getScopes(bot);
+        scope        = await getScopes(bot);
+        bot.bestSell = scope.bestSell
+        bot.bestBuy  = scope.bestBuy
         if (bot.stage == 0) { // looking for scope
             bot.rateRigh = usdtusdnRate; 
             bot.nextTime += setDelay(bot, scope, 'sell'); 
-            console.log(`${bot.strategy} || ${func.nowTime()} || Scope: sell: ${scope.sell.toFixed(2)} || Scope: buy: ${scope.buy.toFixed(2)} || Time: ${scope.time}`);
+            console.log(`${bot.strategy} || ${func.nowTime()} || Scope: sell: ${scope.sell.toFixed(2)}/${bot.bestSell.toFixed(2)} || Scope: buy: ${scope.buy.toFixed(2)}/${bot.bestBuy.toFixed(2)} || Time: ${scope.time}`);
             if (scope.sell > bot.disbalLeft) { // ready to sell from left and buy to right
                 bot.orderLeftSellPrice  = scope.bidLeft;
                 bot.orderRighBuyPrice   = scope.askRigh;
@@ -224,7 +228,7 @@ async function doRebalanceBot(bot) {
             bot.rateRigh = usdtusdnRate; 
             //scope = await getScopes(bot);
             bot.nextTime += setDelay(bot, scope, 'buy');
-            console.log(`${bot.strategy} || ${func.nowTime()} || Scope: buy: ${scope.buy.toFixed(2)} || Scope: sell: ${scope.sell.toFixed(2)} || Time: ${scope.time}`);
+            console.log(`${bot.strategy} || ${func.nowTime()} || Scope: buy: ${scope.buy.toFixed(2)}/${bot.bestBuy.toFixed(2)} || Scope: sell: ${scope.sell.toFixed(2)}/${bot.bestSell.toFixed(2)} || Time: ${scope.time}`);
             if (scope.buy > bot.disbalRigh) { // ready to sell  from right and buy to left
                 bot.orderLeftBuyPrice   = scope.askLeft;
                 bot.orderRighSellPrice  = scope.bidRigh;
@@ -347,6 +351,8 @@ async function doRebalanceBot(bot) {
             console.log('trying to save deal: ', bot.dealId);
             bot.stage   = await db.saveDeal(bot); 
             bot.dealId  = '';
+            bot.bestBuy = 0
+            bot.bestSell= 0
         }
     }
     return bot;
