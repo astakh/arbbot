@@ -302,16 +302,16 @@ async function doRebalanceBot(bot) {
         }
         if (bot.stage == 10) {
             let balance = await bot.exchRigh.fetchBalance();
-            if (balance.USDN.free > bot.amountC * bot.rateRigh) { 
+            if (balance.USDN.free > (bot.amountC * bot.rateRigh)/1.05) { 
                 balance = await bot.exchLeft.fetchBalance();
                 scope   = await getScopes(bot);
-                if (balance.WAVES.free >= bot.amount) {
+                if (balance.WAVES.free >= bot.amount/1.05) {
                     bot.stage = await db.setStage(bot.procId, 0);
                     await db.addLog(`${bot.strategy}:rebalance completed`)
                 }
-                else { console.log(`${bot.strategy}:${bot.stage}: USDN amount too low`); bot.nextTime += 10 * 1000; }
+                else { console.log(`${bot.strategy}:${bot.stage}: WAVES amount too low`); bot.nextTime += 10 * 1000; }
             }
-            else { bot.nextTime += 10 * 1000; }
+            else { bot.nextTime += 10 * 1000; console.log(`${bot.strategy}:${bot.stage}: too small USDN balance`)}
         }
         if (bot.stage == 11) { // try to place order to left buy
             order = await placeOrder(bot.exchLeft, bot.pairLeft, 'limit', 'buy', bot.amount, bot.orderLeftBuyPrice * 1.005);
