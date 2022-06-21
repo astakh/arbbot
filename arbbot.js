@@ -248,6 +248,7 @@ async function doRebalanceBot(bot) {
             }
         }
         if (bot.stage == 5) {
+            bot.rateRigh = usdtusdnRate;
             bot.rebalAmountC  = parseInt(Math.min(
                 bot.balLeftC - 1,
                 bot.balRighA * scope.bidLeft 
