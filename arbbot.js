@@ -31,29 +31,36 @@ async function getScopes(bot) {
     const l     = wavesUsdtPrice[bot.exchangeLeft];
     const r     = await func.getOrdersDirect('wavesdex', 'WAVES', 'DG2xFkPdDwKUoBkzGAhQtLpSGzfXLiCYPEzeKH2Ad24p', bot.amount);
     //console.log('getScopes: ', bot.pairRigh, bot.amount);
-    let res     = {}; 
-    if (l.askPrice>0 && r.askPrice>0) {
-        res.buy     = (r.bidPrice/bot.rateRigh - l.askPrice/bot.rateLeft) / l.askPrice/bot.rateLeft * 100;
-        res.sell    = (l.bidPrice/bot.rateLeft - r.askPrice/bot.rateRigh) / r.askPrice/bot.rateRigh * 100;
-        if (res.buy > bot.bestBuy) {res.bestBuy = res.buy} else {res.bestBuy = bot.bestBuy}
-        if (res.sell> bot.bestSell){res.bestSell= res.sell}else {res.bestSell= bot.bestSell}
-        res.bidLeft = l.bidPrice;
-        res.askLeft = l.askPrice;
-        res.bidRigh = r.bidPrice;
-        res.askRigh = r.askPrice; 
-        res.time    = new Date() - t;
-        res.timeR   = r.time;
-        res.timeL   = 0//l.time;
-        await db.addScope(res.sell, res.buy);
-        return res;
+    let res     = {
+        buy:        0,
+        sell:       0,
+        bidLeft:    0,
+        askLeft:    0,
+        bidRigh:    0,
+        askRigh:    0, 
+        time:       0,
+        timeR:       0,
+        timeL:       0
     }
-    else {
-        res.buy     = 0;
-        res.sell    = 0;
-        res.bidLeft = 0;
-        res.askLeft = 0;
-        res.bidRigh = 0;
-        res.askRigh = 0; 
+    try { 
+        if (l.askPrice>0 && r.askPrice>0) {
+            res.buy     = (r.bidPrice/bot.rateRigh - l.askPrice/bot.rateLeft) / l.askPrice/bot.rateLeft * 100;
+            res.sell    = (l.bidPrice/bot.rateLeft - r.askPrice/bot.rateRigh) / r.askPrice/bot.rateRigh * 100;
+            if (res.buy > bot.bestBuy) {res.bestBuy = res.buy} else {res.bestBuy = bot.bestBuy}
+            if (res.sell> bot.bestSell){res.bestSell= res.sell}else {res.bestSell= bot.bestSell}
+            res.bidLeft = l.bidPrice;
+            res.askLeft = l.askPrice;
+            res.bidRigh = r.bidPrice;
+            res.askRigh = r.askPrice; 
+            res.time    = new Date() - t;
+            res.timeR   = r.time;
+            res.timeL   = 0//l.time;
+            await db.addScope(res.sell, res.buy);
+            return res;
+        }
+    }
+    catch(err) {
+        console.log(err)
         res.time    = new Date() - t;
         return res;
     }
@@ -154,7 +161,8 @@ async function doRebalanceBot(bot) {
         if (bot.stage == 0) { // looking for scope
             bot.rateRigh = usdtusdnRate; 
             bot.nextTime += setDelay(bot, scope, 'sell'); 
-            console.log(`${bot.strategy} || ${func.nowTime()} || Scope: sell: ${scope.sell.toFixed(2)}/${bot.bestSell.toFixed(2)} || Scope: buy: ${scope.buy.toFixed(2)}/${bot.bestBuy.toFixed(2)} || Time: ${scope.time}`);
+            try { console.log(`${bot.strategy} || ${func.nowTime()} || Scope: sell: ${scope.sell.toFixed(2)}/${bot.bestSell.toFixed(2)} || Scope: buy: ${scope.buy.toFixed(2)}/${bot.bestBuy.toFixed(2)} || Time: ${scope.time}`) }
+            catch(err) { console.log(err) }
             if (scope.sell > bot.disbalLeft) { // ready to sell from left and buy to right
                 bot.orderLeftSellPrice  = scope.bidLeft;
                 bot.orderRighBuyPrice   = scope.askRigh;
@@ -228,7 +236,8 @@ async function doRebalanceBot(bot) {
             bot.rateRigh = usdtusdnRate; 
             //scope = await getScopes(bot);
             bot.nextTime += setDelay(bot, scope, 'buy');
-            console.log(`${bot.strategy} || ${func.nowTime()} || Scope: buy: ${scope.buy.toFixed(2)}/${bot.bestBuy.toFixed(2)} || Scope: sell: ${scope.sell.toFixed(2)}/${bot.bestSell.toFixed(2)} || Time: ${scope.time}`);
+            try {console.log(`${bot.strategy} || ${func.nowTime()} || Scope: buy: ${scope.buy.toFixed(2)}/${bot.bestBuy.toFixed(2)} || Scope: sell: ${scope.sell.toFixed(2)}/${bot.bestSell.toFixed(2)} || Time: ${scope.time}`) }
+            catch(err) { console.log(err) }
             if (scope.buy > bot.disbalRigh) { // ready to sell  from right and buy to left
                 bot.orderLeftBuyPrice   = scope.askLeft;
                 bot.orderRighSellPrice  = scope.bidRigh;

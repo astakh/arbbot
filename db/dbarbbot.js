@@ -299,7 +299,7 @@ async function addMask1() {
 
 }
 async function getScopes() {
-    const scopes = Scope.find()
+    const scopes = Scope.find()//.sort({createdAt: 1})
     return scopes
 }
 
